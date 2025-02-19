@@ -72,7 +72,7 @@ type F = GoldilocksField;
 ///     - Any recent block's storage-root can be used for the storage proof. If a block moves out of the recent-set
 ///       before the wormhole exit is included in a block, the wallet can recreate the storage-proof from a more recent block and resubmit it.
 /// - The fee_amount + exit_amount = funding_tx_amount.
-pub fn verify(public_inputs: WormholeProofPublicInputs) {
+pub fn verify(public_inputs: WormholeProofPublicInputs) -> anyhow::Result<()> {
     // Plonky2 circuit setup:
     let config = CircuitConfig::standard_recursion_config();
     let mut builder = CircuitBuilder::<F, D>::new(config);
@@ -84,28 +84,27 @@ pub fn verify(public_inputs: WormholeProofPublicInputs) {
     pw.set_target(
         funding_tx_amount,
         F::from_canonical_u64(public_inputs.funding_tx_amount),
-    )
-    .unwrap();
+    )?;
     pw.set_target(
         exit_amount,
         F::from_canonical_u64(public_inputs.exit_amount),
-    )
-    .unwrap();
-    pw.set_target(fee_amount, F::from_canonical_u64(public_inputs.fee_amount))
-        .unwrap();
+    )?;
+    pw.set_target(fee_amount, F::from_canonical_u64(public_inputs.fee_amount))?;
 
     // Build the circuit.
     let data = builder.build::<C>();
 
     // Generate the proof.
-    let proof = data.prove(pw).unwrap();
+    let proof = data.prove(pw)?;
 
     println!(
         "funding amount: {}\nexit amount: {}\nfee_amount: {}\n",
         proof.public_inputs[0], proof.public_inputs[1], proof.public_inputs[2]
     );
 
-    data.verify(proof).unwrap();
+    data.verify(proof)?;
+
+    Ok(())
 }
 
 fn funding_amount_circuit(builder: &mut CircuitBuilder<F, D>) -> (Target, Target, Target) {
@@ -136,6 +135,6 @@ mod tests {
 
         let public_inputs =
             WormholeProofPublicInputs::new(funding_tx_amount, exit_amount, fee_amount);
-        verify(public_inputs);
+        verify(public_inputs).unwrap();
     }
 }
