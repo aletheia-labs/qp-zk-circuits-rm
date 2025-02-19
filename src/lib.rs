@@ -197,25 +197,62 @@ fn funding_amount_circuit(builder: &mut CircuitBuilder<F, D>) -> (Target, Target
 mod tests {
     use super::*;
 
+    struct WormholeProofTestInputs {
+        public_inputs: WormholeProofPublicInputs,
+        private_inputs: WormholeProofPrivateInputs,
+    }
+
+    impl Default for WormholeProofTestInputs {
+        fn default() -> Self {
+            fn generate_unspendable_account() -> HashOut<F> {
+                HashOut::from_vec(vec![
+                    F::from_canonical_u64(4400158269619346328),
+                    F::from_canonical_u64(7835876850004545748),
+                    F::from_canonical_u64(9949762737399135748),
+                    F::from_canonical_u64(17261303441366130639),
+                ])
+            }
+            let funding_tx_amount = 100;
+            let exit_amount = 90;
+            let fee_amount = 10;
+
+            let unspendable_account = generate_unspendable_account();
+            let unspendable_secret = "~secret~".as_bytes().to_vec();
+            Self {
+                public_inputs: WormholeProofPublicInputs::new(
+                    funding_tx_amount,
+                    exit_amount,
+                    fee_amount,
+                ),
+                private_inputs: WormholeProofPrivateInputs::new(
+                    unspendable_account,
+                    unspendable_secret,
+                ),
+            }
+        }
+    }
+
     #[test]
     fn build_and_verify_proof() {
-        // Setup variables to prove.
-        let funding_tx_amount = 100;
-        let exit_amount = 90;
-        let fee_amount = 10;
+        let inputs = WormholeProofTestInputs::default();
+        verify(inputs.public_inputs, inputs.private_inputs).unwrap();
+    }
 
-        let unspendable_account = HashOut::from_vec(vec![
-            F::from_canonical_u64(4400158269619346328),
-            F::from_canonical_u64(7835876850004545748),
-            F::from_canonical_u64(9949762737399135748),
-            F::from_canonical_u64(17261303441366130639),
-        ]);
-        let unspendable_secret = "~secret~".as_bytes().to_vec();
+    #[test]
+    #[should_panic]
+    fn build_and_verify_proof_wrong_unspendable_secret() {
+        let mut inputs = WormholeProofTestInputs::default();
+        inputs.private_inputs.unspendable_secret = "~wrong-secret~".as_bytes().to_vec();
 
-        let public_inputs =
-            WormholeProofPublicInputs::new(funding_tx_amount, exit_amount, fee_amount);
-        let private_inputs =
-            WormholeProofPrivateInputs::new(unspendable_account, unspendable_secret);
-        verify(public_inputs, private_inputs).unwrap();
+        verify(inputs.public_inputs, inputs.private_inputs).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn build_and_verify_proof_non_zero_sum_amounts() {
+        let mut inputs = WormholeProofTestInputs::default();
+        inputs.public_inputs.exit_amount = 200;
+
+        verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
 }
