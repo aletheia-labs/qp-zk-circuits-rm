@@ -78,7 +78,7 @@ impl CircuitFragment for UnspendableAccount {
     type Targets = UnspendableAccountTargets;
 
     /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> UnspendableAccountTargets {
+    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let account_id = builder.add_virtual_hash();
         let preimage = builder.add_virtual_targets(self.preimage.len());
 
@@ -102,7 +102,7 @@ impl CircuitFragment for UnspendableAccount {
     fn fill_targets(
         &self,
         pw: &mut PartialWitness<F>,
-        targets: UnspendableAccountTargets,
+        targets: Self::Targets,
     ) -> anyhow::Result<()> {
         // Unspendable account circuit values.
         pw.set_hash_target(targets.account_id, HashOut::from_partial(&self.account_id))?;
@@ -114,17 +114,74 @@ impl CircuitFragment for UnspendableAccount {
     }
 }
 
-pub struct WormholeProofPublicInputs {
-    // Prevents double-claims (double hash of salt + txid + secret)
-    // nullifier: [u8; 64],
-    // Account the user wishes to withdraw to
-    // exit_account: AccountId,
+pub struct Amounts {
     /// The amount that a wormhole deposit adress was funded with
     funding_tx_amount: u64,
     /// Amount to be given to exit_account
     exit_amount: u64,
     /// Amount to be given to miner
     fee_amount: u64,
+}
+
+impl Amounts {
+    pub fn new(funding_tx_amount: u64, exit_amount: u64, fee_amount: u64) -> Self {
+        Self {
+            funding_tx_amount,
+            exit_amount,
+            fee_amount,
+        }
+    }
+}
+
+pub struct AmountsTargets {
+    funding_tx_amount: Target,
+    exit_amount: Target,
+    fee_amount: Target,
+}
+
+impl CircuitFragment for Amounts {
+    type Targets = AmountsTargets;
+
+    /// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
+    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
+        let funding_tx_amount = builder.add_virtual_target();
+        let exit_amount = builder.add_virtual_target();
+        let fee_amount = builder.add_virtual_target();
+
+        builder.register_public_input(funding_tx_amount);
+        builder.register_public_input(exit_amount);
+        builder.register_public_input(fee_amount);
+
+        let sum = builder.add(exit_amount, fee_amount);
+        builder.connect(sum, funding_tx_amount);
+
+        AmountsTargets {
+            funding_tx_amount,
+            exit_amount,
+            fee_amount,
+        }
+    }
+
+    fn fill_targets(
+        &self,
+        pw: &mut PartialWitness<F>,
+        targets: Self::Targets,
+    ) -> anyhow::Result<()> {
+        pw.set_target(
+            targets.funding_tx_amount,
+            F::from_canonical_u64(self.funding_tx_amount),
+        )?;
+        pw.set_target(targets.exit_amount, F::from_canonical_u64(self.exit_amount))?;
+        pw.set_target(targets.fee_amount, F::from_canonical_u64(self.fee_amount))
+    }
+}
+
+pub struct WormholeProofPublicInputs {
+    // Prevents double-claims (double hash of salt + txid + secret)
+    // nullifier: [u8; 64],
+    // Account the user wishes to withdraw to
+    // exit_account: AccountId,
+    amounts: Amounts,
     // Used to verify the transaction success event
     // storage_root: [u8; 32],
     // The order that the tx was mined in
@@ -132,12 +189,8 @@ pub struct WormholeProofPublicInputs {
 }
 
 impl WormholeProofPublicInputs {
-    pub fn new(funding_tx_amount: u64, exit_amount: u64, fee_amount: u64) -> Self {
-        Self {
-            funding_tx_amount,
-            exit_amount,
-            fee_amount,
-        }
+    pub fn new(amounts: Amounts) -> Self {
+        Self { amounts }
     }
 }
 
@@ -180,23 +233,15 @@ pub fn verify(
 
     // Setup all the circuits.
     let unspendable_account_targets = private_inputs.unspendable_account.circuit(&mut builder);
-    let (funding_tx_amount, exit_amount, fee_amount) = funding_amount_circuit(&mut builder);
+    let amounts_targets = public_inputs.amounts.circuit(&mut builder);
 
     let mut pw = PartialWitness::new();
     private_inputs
         .unspendable_account
         .fill_targets(&mut pw, unspendable_account_targets)?;
-
-    // Funding amount circuit values.
-    pw.set_target(
-        funding_tx_amount,
-        F::from_canonical_u64(public_inputs.funding_tx_amount),
-    )?;
-    pw.set_target(
-        exit_amount,
-        F::from_canonical_u64(public_inputs.exit_amount),
-    )?;
-    pw.set_target(fee_amount, F::from_canonical_u64(public_inputs.fee_amount))?;
+    public_inputs
+        .amounts
+        .fill_targets(&mut pw, amounts_targets)?;
 
     // Build the circuit.
     let data = builder.build::<C>();
@@ -212,22 +257,6 @@ pub fn verify(
     data.verify(proof)?;
 
     Ok(())
-}
-
-/// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
-fn funding_amount_circuit(builder: &mut CircuitBuilder<F, D>) -> (Target, Target, Target) {
-    let funding_tx_amount = builder.add_virtual_target();
-    let exit_amount = builder.add_virtual_target();
-    let fee_amount = builder.add_virtual_target();
-
-    builder.register_public_input(funding_tx_amount);
-    builder.register_public_input(exit_amount);
-    builder.register_public_input(fee_amount);
-
-    let sum = builder.add(exit_amount, fee_amount);
-    builder.connect(sum, funding_tx_amount);
-
-    (funding_tx_amount, exit_amount, fee_amount)
 }
 
 #[cfg(test)]
@@ -255,11 +284,11 @@ mod tests {
             let fee_amount = 10;
 
             Self {
-                public_inputs: WormholeProofPublicInputs::new(
+                public_inputs: WormholeProofPublicInputs::new(Amounts::new(
                     funding_tx_amount,
                     exit_amount,
                     fee_amount,
-                ),
+                )),
                 private_inputs: WormholeProofPrivateInputs::new(UnspendableAccount::new(
                     generate_unspendable_account_id(),
                     "~secret~",
@@ -288,7 +317,7 @@ mod tests {
     #[should_panic]
     fn build_and_verify_proof_non_zero_sum_amounts() {
         let mut inputs = WormholeProofTestInputs::default();
-        inputs.public_inputs.exit_amount = 200;
+        inputs.public_inputs.amounts.exit_amount = 200;
 
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
