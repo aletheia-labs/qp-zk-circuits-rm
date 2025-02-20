@@ -17,6 +17,7 @@ use plonky2::{
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
+pub type Digest = [F; 4];
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
 
@@ -24,7 +25,7 @@ pub type F = GoldilocksField;
 pub const ACCOUNT_HASH_SIZE: usize = 16;
 pub const SALT: &[u8] = "~wormhole~".as_bytes();
 
-pub type AccountId = HashOut<F>;
+pub type AccountId = Digest;
 
 pub struct WormholeProofPublicInputs {
     // Prevents double-claims (double hash of salt + txid + secret)
@@ -120,7 +121,10 @@ pub fn verify(
     let mut pw = PartialWitness::new();
 
     // Unspendable account circuit values.
-    pw.set_hash_target(unspendable_account, private_inputs.unspendable_account)?;
+    pw.set_hash_target(
+        unspendable_account,
+        HashOut::from_partial(&private_inputs.unspendable_account),
+    )?;
     for i in 0..preimage.len() {
         pw.set_target(preimage_target[i], preimage[i])?;
     }
@@ -204,13 +208,13 @@ mod tests {
 
     impl Default for WormholeProofTestInputs {
         fn default() -> Self {
-            fn generate_unspendable_account() -> HashOut<F> {
-                HashOut::from_vec(vec![
+            fn generate_unspendable_account() -> Digest {
+                [
                     F::from_canonical_u64(4400158269619346328),
                     F::from_canonical_u64(7835876850004545748),
                     F::from_canonical_u64(9949762737399135748),
                     F::from_canonical_u64(17261303441366130639),
-                ])
+                ]
             }
             let funding_tx_amount = 100;
             let exit_amount = 90;
