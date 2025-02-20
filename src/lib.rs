@@ -27,6 +27,93 @@ pub const SALT: &[u8] = "~wormhole~".as_bytes();
 
 pub type AccountId = Digest;
 
+pub trait CircuitFragment {
+    type Targets;
+
+    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets;
+
+    fn fill_targets(
+        &self,
+        pw: &mut PartialWitness<F>,
+        targets: Self::Targets,
+    ) -> anyhow::Result<()>;
+}
+
+pub struct UnspendableAccount {
+    account_id: AccountId,
+    preimage: Vec<F>,
+}
+
+impl UnspendableAccount {
+    pub fn new(account_id: AccountId, secret: &str) -> Self {
+        // Calculate the preimage by concatanating [`SALT`] and the secret value.
+        let secret = secret.as_bytes().to_vec();
+        let preimage: Vec<F> = [SALT, &secret]
+            .concat()
+            .iter()
+            .map(|v| F::from_canonical_u8(*v))
+            .collect();
+
+        // FIXME: For debugging.
+        println!("SALT: {}", String::from_utf8(SALT.to_vec()).unwrap());
+        println!("SECRET: {}", String::from_utf8(secret).unwrap());
+        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
+        println!("HASH: {:?}", inner_hash);
+        let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
+        println!("DOUBLE HASH: {:?}", double_hash);
+
+        Self {
+            account_id,
+            preimage,
+        }
+    }
+}
+
+pub struct UnspendableAccountTargets {
+    account_id: HashOutTarget,
+    preimage: Vec<Target>,
+}
+
+impl CircuitFragment for UnspendableAccount {
+    type Targets = UnspendableAccountTargets;
+
+    /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
+    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> UnspendableAccountTargets {
+        let account_id = builder.add_virtual_hash();
+        let preimage = builder.add_virtual_targets(self.preimage.len());
+
+        // Compute the `generated_account` by double-hashing the preimage (salt + secret).
+        // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
+        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
+        let generated_account =
+            builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
+
+        // Assert that hashes are equal.
+        for i in 0..4 {
+            builder.connect(account_id.elements[i], generated_account.elements[i]);
+        }
+
+        UnspendableAccountTargets {
+            account_id,
+            preimage,
+        }
+    }
+
+    fn fill_targets(
+        &self,
+        pw: &mut PartialWitness<F>,
+        targets: UnspendableAccountTargets,
+    ) -> anyhow::Result<()> {
+        // Unspendable account circuit values.
+        pw.set_hash_target(targets.account_id, HashOut::from_partial(&self.account_id))?;
+        for (i, v) in self.preimage.iter().enumerate() {
+            pw.set_target(targets.preimage[i], *v)?;
+        }
+
+        Ok(())
+    }
+}
+
 pub struct WormholeProofPublicInputs {
     // Prevents double-claims (double hash of salt + txid + secret)
     // nullifier: [u8; 64],
@@ -58,18 +145,15 @@ pub struct WormholeProofPrivateInputs {
     // Event that resulted from funding the unspendable address
     // funding_event: Vec<u8>,
     /// Unspendable account
-    unspendable_account: AccountId,
+    unspendable_account: UnspendableAccount,
     // Proves balance
     // storage_proof: Vec<u8>,
-    /// Secret value preimage of unspendable_address, this is also used in the nullifier computation
-    unspendable_secret: Vec<u8>,
 }
 
 impl WormholeProofPrivateInputs {
-    pub fn new(unspendable_account: AccountId, unspendable_secret: Vec<u8>) -> Self {
+    pub fn new(unspendable_account: UnspendableAccount) -> Self {
         Self {
             unspendable_account,
-            unspendable_secret,
         }
     }
 }
@@ -94,40 +178,14 @@ pub fn verify(
     let config = CircuitConfig::standard_recursion_config();
     let mut builder = CircuitBuilder::<F, D>::new(config);
 
-    // Calculate the preimage, we need to do this before setting up the circuits so that we know
-    // the correct length.
-    let preimage: Vec<F> = [SALT, &private_inputs.unspendable_secret]
-        .concat()
-        .iter()
-        .map(|v| F::from_canonical_u8(*v))
-        .collect();
-
-    // FIXME: For debugging.
-    println!("SALT: {}", String::from_utf8(SALT.to_vec())?);
-    println!(
-        "SECRET: {}",
-        String::from_utf8(private_inputs.unspendable_secret)?
-    );
-    let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
-    println!("HASH: {:?}", inner_hash);
-    let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
-    println!("DOUBLE HASH: {:?}", double_hash);
-
     // Setup all the circuits.
-    let (unspendable_account, preimage_target) =
-        unspendable_account_circuit(&mut builder, preimage.len());
+    let unspendable_account_targets = private_inputs.unspendable_account.circuit(&mut builder);
     let (funding_tx_amount, exit_amount, fee_amount) = funding_amount_circuit(&mut builder);
 
     let mut pw = PartialWitness::new();
-
-    // Unspendable account circuit values.
-    pw.set_hash_target(
-        unspendable_account,
-        HashOut::from_partial(&private_inputs.unspendable_account),
-    )?;
-    for i in 0..preimage.len() {
-        pw.set_target(preimage_target[i], preimage[i])?;
-    }
+    private_inputs
+        .unspendable_account
+        .fill_targets(&mut pw, unspendable_account_targets)?;
 
     // Funding amount circuit values.
     pw.set_target(
@@ -156,31 +214,6 @@ pub fn verify(
     Ok(())
 }
 
-/// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
-fn unspendable_account_circuit(
-    builder: &mut CircuitBuilder<F, D>,
-    preimage_size: usize,
-) -> (HashOutTarget, Vec<Target>) {
-    let unspendable_account = builder.add_virtual_hash();
-    let preimage = builder.add_virtual_targets(preimage_size);
-
-    // Compute the `generated_account` by double-hashing the preimage (salt + secret).
-    // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
-    let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
-    let generated_account =
-        builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
-
-    // Assert that hashes are equal.
-    for i in 0..4 {
-        builder.connect(
-            unspendable_account.elements[i],
-            generated_account.elements[i],
-        );
-    }
-
-    (unspendable_account, preimage)
-}
-
 /// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
 fn funding_amount_circuit(builder: &mut CircuitBuilder<F, D>) -> (Target, Target, Target) {
     let funding_tx_amount = builder.add_virtual_target();
@@ -201,6 +234,15 @@ fn funding_amount_circuit(builder: &mut CircuitBuilder<F, D>) -> (Target, Target
 mod tests {
     use super::*;
 
+    fn generate_unspendable_account_id() -> Digest {
+        [
+            F::from_canonical_u64(4400158269619346328),
+            F::from_canonical_u64(7835876850004545748),
+            F::from_canonical_u64(9949762737399135748),
+            F::from_canonical_u64(17261303441366130639),
+        ]
+    }
+
     struct WormholeProofTestInputs {
         public_inputs: WormholeProofPublicInputs,
         private_inputs: WormholeProofPrivateInputs,
@@ -208,30 +250,20 @@ mod tests {
 
     impl Default for WormholeProofTestInputs {
         fn default() -> Self {
-            fn generate_unspendable_account() -> Digest {
-                [
-                    F::from_canonical_u64(4400158269619346328),
-                    F::from_canonical_u64(7835876850004545748),
-                    F::from_canonical_u64(9949762737399135748),
-                    F::from_canonical_u64(17261303441366130639),
-                ]
-            }
             let funding_tx_amount = 100;
             let exit_amount = 90;
             let fee_amount = 10;
 
-            let unspendable_account = generate_unspendable_account();
-            let unspendable_secret = "~secret~".as_bytes().to_vec();
             Self {
                 public_inputs: WormholeProofPublicInputs::new(
                     funding_tx_amount,
                     exit_amount,
                     fee_amount,
                 ),
-                private_inputs: WormholeProofPrivateInputs::new(
-                    unspendable_account,
-                    unspendable_secret,
-                ),
+                private_inputs: WormholeProofPrivateInputs::new(UnspendableAccount::new(
+                    generate_unspendable_account_id(),
+                    "~secret~",
+                )),
             }
         }
     }
@@ -246,7 +278,8 @@ mod tests {
     #[should_panic]
     fn build_and_verify_proof_wrong_unspendable_secret() {
         let mut inputs = WormholeProofTestInputs::default();
-        inputs.private_inputs.unspendable_secret = "~wrong-secret~".as_bytes().to_vec();
+        inputs.private_inputs.unspendable_account =
+            UnspendableAccount::new(generate_unspendable_account_id(), "~wrong-secret~");
 
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
