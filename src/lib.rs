@@ -23,6 +23,7 @@ pub type F = GoldilocksField;
 
 // TODO: Correct constants.
 pub const ACCOUNT_HASH_SIZE: usize = 16;
+// NOTE: Is the same salt used for unspendable account generation and nullifier generation?
 pub const SALT: &[u8] = "~wormhole~".as_bytes();
 
 pub type AccountId = Digest;
@@ -55,12 +56,12 @@ impl UnspendableAccount {
             .collect();
 
         // FIXME: For debugging.
-        println!("SALT: {}", String::from_utf8(SALT.to_vec()).unwrap());
-        println!("SECRET: {}", String::from_utf8(secret).unwrap());
-        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
-        println!("HASH: {:?}", inner_hash);
-        let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
-        println!("DOUBLE HASH: {:?}", double_hash);
+        // println!("SALT: {}", String::from_utf8(SALT.to_vec()).unwrap());
+        // println!("SECRET: {}", String::from_utf8(secret).unwrap());
+        // let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
+        // println!("HASH: {:?}", inner_hash);
+        // let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
+        // println!("DOUBLE HASH: {:?}", double_hash);
 
         Self {
             account_id,
@@ -176,9 +177,77 @@ impl CircuitFragment for Amounts {
     }
 }
 
+pub struct Nullifier {
+    hash: [F; 4],
+    preimage: Vec<F>,
+}
+
+impl Nullifier {
+    pub fn new(hash: [F; 4], entrinsic_tx: u64, secret: &str) -> Self {
+        // Calculate the preimage by concatanating [`SALT`], the entrinsic_tx and the secret value.
+        let entrinsic_tx = entrinsic_tx.to_be_bytes();
+        let secret = secret.as_bytes().to_vec();
+        let preimage: Vec<F> = [SALT, &entrinsic_tx, &secret]
+            .concat()
+            .iter()
+            .map(|v| F::from_canonical_u8(*v))
+            .collect();
+
+        // FIXME: For debugging.
+        println!("SALT: {}", String::from_utf8(SALT.to_vec()).unwrap());
+        println!("SECRET: {}", String::from_utf8(secret).unwrap());
+        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
+        println!("HASH: {:?}", inner_hash);
+        let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
+        println!("DOUBLE HASH: {:?}", double_hash);
+
+        Self { hash, preimage }
+    }
+}
+
+pub struct NullifierTargets {
+    hash: HashOutTarget,
+    preimage: Vec<Target>,
+}
+
+impl CircuitFragment for Nullifier {
+    type Targets = NullifierTargets;
+
+    /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
+    /// extrinsic_index + secret))`
+    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
+        let hash = builder.add_virtual_hash();
+        let preimage = builder.add_virtual_targets(self.preimage.len());
+
+        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
+        let outer_hash =
+            builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
+
+        // Assert that hashes are equal.
+        for i in 0..4 {
+            builder.connect(hash.elements[i], outer_hash.elements[i]);
+        }
+
+        NullifierTargets { hash, preimage }
+    }
+
+    fn fill_targets(
+        &self,
+        pw: &mut PartialWitness<F>,
+        targets: Self::Targets,
+    ) -> anyhow::Result<()> {
+        pw.set_hash_target(targets.hash, HashOut::from_partial(&self.hash))?;
+        for (i, v) in self.preimage.iter().enumerate() {
+            pw.set_target(targets.preimage[i], *v)?;
+        }
+
+        Ok(())
+    }
+}
+
 pub struct WormholeProofPublicInputs {
     // Prevents double-claims (double hash of salt + txid + secret)
-    // nullifier: [u8; 64],
+    nullifier: Nullifier,
     // Account the user wishes to withdraw to
     // exit_account: AccountId,
     amounts: Amounts,
@@ -189,8 +258,8 @@ pub struct WormholeProofPublicInputs {
 }
 
 impl WormholeProofPublicInputs {
-    pub fn new(amounts: Amounts) -> Self {
-        Self { amounts }
+    pub fn new(amounts: Amounts, nullifier: Nullifier) -> Self {
+        Self { amounts, nullifier }
     }
 }
 
@@ -234,6 +303,7 @@ pub fn verify(
     // Setup all the circuits.
     let unspendable_account_targets = private_inputs.unspendable_account.circuit(&mut builder);
     let amounts_targets = public_inputs.amounts.circuit(&mut builder);
+    let nullifier_targets = public_inputs.nullifier.circuit(&mut builder);
 
     let mut pw = PartialWitness::new();
     private_inputs
@@ -242,6 +312,9 @@ pub fn verify(
     public_inputs
         .amounts
         .fill_targets(&mut pw, amounts_targets)?;
+    public_inputs
+        .nullifier
+        .fill_targets(&mut pw, nullifier_targets)?;
 
     // Build the circuit.
     let data = builder.build::<C>();
@@ -272,6 +345,15 @@ mod tests {
         ]
     }
 
+    fn generate_nullifier() -> Digest {
+        [
+            F::from_canonical_u64(3594886491536011690),
+            F::from_canonical_u64(4580162421460385146),
+            F::from_canonical_u64(18068355128152899950),
+            F::from_canonical_u64(10646865655309129121),
+        ]
+    }
+
     struct WormholeProofTestInputs {
         public_inputs: WormholeProofPublicInputs,
         private_inputs: WormholeProofPrivateInputs,
@@ -284,11 +366,10 @@ mod tests {
             let fee_amount = 10;
 
             Self {
-                public_inputs: WormholeProofPublicInputs::new(Amounts::new(
-                    funding_tx_amount,
-                    exit_amount,
-                    fee_amount,
-                )),
+                public_inputs: WormholeProofPublicInputs::new(
+                    Amounts::new(funding_tx_amount, exit_amount, fee_amount),
+                    Nullifier::new(generate_nullifier(), 0, "~secret~"),
+                ),
                 private_inputs: WormholeProofPrivateInputs::new(UnspendableAccount::new(
                     generate_unspendable_account_id(),
                     "~secret~",
@@ -309,6 +390,15 @@ mod tests {
         let mut inputs = WormholeProofTestInputs::default();
         inputs.private_inputs.unspendable_account =
             UnspendableAccount::new(generate_unspendable_account_id(), "~wrong-secret~");
+
+        verify(inputs.public_inputs, inputs.private_inputs).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn build_and_verify_proof_wrong_nullifier_secret() {
+        let mut inputs = WormholeProofTestInputs::default();
+        inputs.public_inputs.nullifier = Nullifier::new(generate_nullifier(), 0, "~wrong-secret~");
 
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
