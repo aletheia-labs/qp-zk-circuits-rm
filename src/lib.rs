@@ -9,9 +9,8 @@ use plonky2::{
         witness::{PartialWitness, WitnessWrite},
     },
     plonk::{
-        circuit_builder::CircuitBuilder,
-        circuit_data::CircuitConfig,
-        config::{Hasher, PoseidonGoldilocksConfig},
+        circuit_builder::CircuitBuilder, circuit_data::CircuitConfig,
+        config::PoseidonGoldilocksConfig,
     },
 };
 
@@ -54,14 +53,6 @@ impl UnspendableAccount {
             .iter()
             .map(|v| F::from_canonical_u8(*v))
             .collect();
-
-        // FIXME: For debugging.
-        // println!("SALT: {}", String::from_utf8(SALT.to_vec()).unwrap());
-        // println!("SECRET: {}", String::from_utf8(secret).unwrap());
-        // let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
-        // println!("HASH: {:?}", inner_hash);
-        // let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
-        // println!("DOUBLE HASH: {:?}", double_hash);
 
         Self {
             account_id,
@@ -192,14 +183,6 @@ impl Nullifier {
             .iter()
             .map(|v| F::from_canonical_u8(*v))
             .collect();
-
-        // FIXME: For debugging.
-        println!("SALT: {}", String::from_utf8(SALT.to_vec()).unwrap());
-        println!("SECRET: {}", String::from_utf8(secret).unwrap());
-        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
-        println!("HASH: {:?}", inner_hash);
-        let double_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
-        println!("DOUBLE HASH: {:?}", double_hash);
 
         Self { hash, preimage }
     }
