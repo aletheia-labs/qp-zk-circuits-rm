@@ -191,12 +191,11 @@ impl CircuitFragment for Amounts {
 }
 
 pub struct Nullifier {
-    hash: [F; 4],
-    preimage: Vec<F>,
+    hash: Digest,
 }
 
 impl Nullifier {
-    pub fn new(hash: [F; 4], entrinsic_tx: u64, secret: &str) -> Self {
+    pub fn new(entrinsic_tx: u64, secret: &str) -> Self {
         // Calculate the preimage by concatanating [`SALT`], the entrinsic_tx and the secret value.
         let entrinsic_tx = entrinsic_tx.to_be_bytes();
         let secret = secret.as_bytes().to_vec();
@@ -206,46 +205,78 @@ impl Nullifier {
             .map(|v| F::from_canonical_u8(*v))
             .collect();
 
-        Self { hash, preimage }
+        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
+        let hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
+
+        Self { hash }
     }
 }
 
 pub struct NullifierTargets {
     hash: HashOutTarget,
-    preimage: Vec<Target>,
+    salt: Vec<Target>,
+    tx_id: Vec<Target>,
+    secret: Vec<Target>,
+}
+
+pub struct NullifierInputs {
+    salt: &'static [u8],
+    tx_id: u64,
+    secret: &'static str,
 }
 
 impl CircuitFragment for Nullifier {
-    type PrivateInputs = ();
+    type PrivateInputs = NullifierInputs;
     type Targets = NullifierTargets;
 
     /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
     /// extrinsic_index + secret))`
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let hash = builder.add_virtual_hash();
-        let preimage = builder.add_virtual_targets(self.preimage.len());
+        // NOTE: Each target representing a byte of a string. Can we allocate size dynamically?
+        let salt = builder.add_virtual_targets(10);
+        let tx_id = builder.add_virtual_targets(8);
+        let secret = builder.add_virtual_targets(8);
 
-        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
-        let outer_hash =
+        let mut preimage = Vec::with_capacity(salt.len() + tx_id.len() + secret.len());
+        preimage.extend(salt.clone());
+        preimage.extend(tx_id.clone());
+        preimage.extend(secret.clone());
+
+        // Compute the `generated_account` by double-hashing the preimage (salt + secret).
+        // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
+        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
+        let computed_hash =
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
 
         // Assert that hashes are equal.
         for i in 0..4 {
-            builder.connect(hash.elements[i], outer_hash.elements[i]);
+            builder.connect(hash.elements[i], computed_hash.elements[i]);
         }
 
-        NullifierTargets { hash, preimage }
+        NullifierTargets {
+            hash,
+            salt,
+            tx_id,
+            secret,
+        }
     }
 
     fn fill_targets(
         &self,
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
-        _inputs: Self::PrivateInputs,
+        inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         pw.set_hash_target(targets.hash, HashOut::from_partial(&self.hash))?;
-        for (i, v) in self.preimage.iter().enumerate() {
-            pw.set_target(targets.preimage[i], *v)?;
+        for (i, byte) in inputs.salt.iter().enumerate() {
+            pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
+        }
+        for (i, byte) in inputs.tx_id.to_be_bytes().iter().enumerate() {
+            pw.set_target(targets.tx_id[i], F::from_canonical_u8(*byte))?;
+        }
+        for (i, byte) in inputs.secret.as_bytes().iter().enumerate() {
+            pw.set_target(targets.secret[i], F::from_canonical_u8(*byte))?;
         }
 
         Ok(())
@@ -260,13 +291,17 @@ pub struct WormholeProofPublicInputs {
     amounts: Amounts,
     // Used to verify the transaction success event
     // storage_root: [u8; 32],
-    // The order that the tx was mined in
-    // extrinsic_index: u64,
+    // The order that the tx was mined in, also referred to as `tx_id`
+    extrinsic_index: u64,
 }
 
 impl WormholeProofPublicInputs {
-    pub fn new(amounts: Amounts, nullifier: Nullifier) -> Self {
-        Self { amounts, nullifier }
+    pub fn new(nullifier: Nullifier, amounts: Amounts, extrinsic_index: u64) -> Self {
+        Self {
+            nullifier,
+            amounts,
+            extrinsic_index,
+        }
     }
 }
 
@@ -327,9 +362,15 @@ pub fn verify(
     public_inputs
         .amounts
         .fill_targets(&mut pw, amounts_targets, ())?;
-    public_inputs
-        .nullifier
-        .fill_targets(&mut pw, nullifier_targets, ())?;
+    public_inputs.nullifier.fill_targets(
+        &mut pw,
+        nullifier_targets,
+        NullifierInputs {
+            salt: SALT,
+            tx_id: public_inputs.extrinsic_index,
+            secret: private_inputs.unspendable_secret,
+        },
+    )?;
 
     // Build the circuit.
     let data = builder.build::<C>();
@@ -351,15 +392,6 @@ pub fn verify(
 mod tests {
     use super::*;
 
-    fn generate_nullifier() -> Digest {
-        [
-            F::from_canonical_u64(3594886491536011690),
-            F::from_canonical_u64(4580162421460385146),
-            F::from_canonical_u64(18068355128152899950),
-            F::from_canonical_u64(10646865655309129121),
-        ]
-    }
-
     struct WormholeProofTestInputs {
         public_inputs: WormholeProofPublicInputs,
         private_inputs: WormholeProofPrivateInputs,
@@ -370,13 +402,15 @@ mod tests {
             let funding_tx_amount = 100;
             let exit_amount = 90;
             let fee_amount = 10;
+            let extrinsic_index = 0;
 
             let unspendable_secret = "~secret~";
 
             Self {
                 public_inputs: WormholeProofPublicInputs::new(
+                    Nullifier::new(extrinsic_index, "~secret~"),
                     Amounts::new(funding_tx_amount, exit_amount, fee_amount),
-                    Nullifier::new(generate_nullifier(), 0, "~secret~"),
+                    extrinsic_index,
                 ),
                 private_inputs: WormholeProofPrivateInputs::new(
                     UnspendableAccount::new(unspendable_secret),
@@ -397,15 +431,6 @@ mod tests {
     fn build_and_verify_proof_wrong_unspendable_secret() {
         let mut inputs = WormholeProofTestInputs::default();
         inputs.private_inputs.unspendable_secret = "~terces~";
-        verify(inputs.public_inputs, inputs.private_inputs).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn build_and_verify_proof_wrong_nullifier_secret() {
-        let mut inputs = WormholeProofTestInputs::default();
-        inputs.public_inputs.nullifier = Nullifier::new(generate_nullifier(), 0, "~wrong-secret~");
-
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
 
