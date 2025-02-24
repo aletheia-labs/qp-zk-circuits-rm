@@ -12,6 +12,7 @@ use plonky2::{
         circuit_builder::CircuitBuilder,
         circuit_data::CircuitConfig,
         config::{Hasher, PoseidonGoldilocksConfig},
+        proof::ProofWithPublicInputs,
     },
 };
 
@@ -88,6 +89,11 @@ impl CircuitFragment for UnspendableAccount {
         let mut preimage = Vec::with_capacity(salt.len() + secret.len());
         preimage.extend(salt.clone());
         preimage.extend(secret.clone());
+
+        // Expose public inputs.
+        for target in &preimage {
+            builder.register_public_input(*target);
+        }
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
@@ -243,6 +249,11 @@ impl CircuitFragment for Nullifier {
         preimage.extend(tx_id.clone());
         preimage.extend(secret.clone());
 
+        // Expose public inputs.
+        for target in &preimage {
+            builder.register_public_input(*target);
+        }
+
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
@@ -340,7 +351,7 @@ impl WormholeProofPrivateInputs {
 pub fn verify(
     public_inputs: WormholeProofPublicInputs,
     private_inputs: WormholeProofPrivateInputs,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
     // Plonky2 circuit config setup:
     let config = CircuitConfig::standard_recursion_config();
     let mut builder = CircuitBuilder::<F, D>::new(config);
@@ -377,20 +388,22 @@ pub fn verify(
 
     // Generate the proof.
     let proof = data.prove(pw)?;
+    data.verify(proof.clone())?;
 
-    println!(
-        "FUNDING: {}\nEXIT: {}\nFEE: {}\n",
-        proof.public_inputs[0], proof.public_inputs[1], proof.public_inputs[2]
-    );
-
-    data.verify(proof)?;
-
-    Ok(())
+    Ok(proof)
 }
 
 #[cfg(test)]
 mod tests {
+    use plonky2::field::types::PrimeField64;
+
     use super::*;
+
+    const EXPECTED_PUBLIC_INPUTS: [u64; 47] = [
+        126, 119, 111, 114, 109, 104, 111, 108, 101, 126, 126, 115, 101, 99, 114, 101, 116, 126,
+        100, 90, 10, 126, 119, 111, 114, 109, 104, 111, 108, 101, 126, 0, 0, 0, 0, 0, 0, 0, 0, 126,
+        115, 101, 99, 114, 101, 116, 126,
+    ];
 
     struct WormholeProofTestInputs {
         public_inputs: WormholeProofPublicInputs,
@@ -424,6 +437,16 @@ mod tests {
     fn build_and_verify_proof() {
         let inputs = WormholeProofTestInputs::default();
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
+    }
+
+    #[test]
+    fn only_public_inputs_are_exposed() {
+        let inputs = WormholeProofTestInputs::default();
+        let proof = verify(inputs.public_inputs, inputs.private_inputs).unwrap();
+
+        for (i, input) in proof.public_inputs.iter().enumerate() {
+            assert_eq!(input.to_noncanonical_u64(), EXPECTED_PUBLIC_INPUTS[i]);
+        }
     }
 
     #[test]
