@@ -24,7 +24,6 @@ pub type F = GoldilocksField;
 
 // TODO: Correct constants.
 pub const ACCOUNT_HASH_SIZE: usize = 16;
-// NOTE: Is the same salt used for unspendable account generation and nullifier generation?
 pub const SALT: &[u8] = "~wormhole~".as_bytes();
 
 pub type AccountId = Digest;
