@@ -90,11 +90,6 @@ impl CircuitFragment for UnspendableAccount {
         preimage.extend(salt.clone());
         preimage.extend(secret.clone());
 
-        // Expose public inputs.
-        for target in &preimage {
-            builder.register_public_input(*target);
-        }
-
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
         let generated_account =
@@ -237,7 +232,7 @@ impl CircuitFragment for Nullifier {
     /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
     /// extrinsic_index + secret))`
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let hash = builder.add_virtual_hash();
+        let hash = builder.add_virtual_hash_public_input();
         let salt = builder.add_virtual_targets(8);
         let tx_id = builder.add_virtual_targets(8);
         let secret = builder.add_virtual_targets(32);
@@ -247,10 +242,8 @@ impl CircuitFragment for Nullifier {
         preimage.extend(tx_id.clone());
         preimage.extend(secret.clone());
 
-        // Expose public inputs.
-        for target in &preimage {
-            builder.register_public_input(*target);
-        }
+        // Expose tx id as a public input.
+        builder.register_public_inputs(&tx_id);
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
@@ -407,10 +400,22 @@ mod tests {
 
     use super::*;
 
-    const EXPECTED_PUBLIC_INPUTS: [u64; 47] = [
-        126, 119, 111, 114, 109, 104, 111, 108, 101, 126, 126, 115, 101, 99, 114, 101, 116, 126,
-        100, 90, 10, 126, 119, 111, 114, 109, 104, 111, 108, 101, 126, 0, 0, 0, 0, 0, 0, 0, 0, 126,
-        115, 101, 99, 114, 101, 116, 126,
+    const EXPECTED_PUBLIC_INPUTS: [u64; 15] = [
+        100,
+        90,
+        10,
+        3057985780030117758,
+        8797366881033976523,
+        4328197692386296141,
+        16319348266743790422,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
     ];
 
     struct WormholeProofTestInputs {
