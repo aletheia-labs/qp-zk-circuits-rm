@@ -25,6 +25,7 @@ pub type F = GoldilocksField;
 // TODO: Correct constants.
 pub const ACCOUNT_HASH_SIZE: usize = 16;
 pub const SALT: &[u8] = "~wormhole~".as_bytes();
+pub const SALT: &[u8] = "wormhole".as_bytes();
 
 pub type AccountId = Digest;
 
