@@ -24,7 +24,6 @@ pub type F = GoldilocksField;
 
 // TODO: Correct constants.
 pub const ACCOUNT_HASH_SIZE: usize = 16;
-pub const SALT: &[u8] = "~wormhole~".as_bytes();
 pub const SALT: &[u8] = "wormhole".as_bytes();
 
 pub type AccountId = Digest;
@@ -48,8 +47,10 @@ pub struct UnspendableAccount {
 
 impl UnspendableAccount {
     pub fn new(secret: &str) -> Self {
+        // First, convert the secret to its bytes representation.
+        let secret = string_to_padded_32_byte_array(secret);
+
         // Calculate the preimage by concatanating [`SALT`] and the secret value.
-        let secret = secret.as_bytes().to_vec();
         let preimage: Vec<F> = [SALT, &secret]
             .concat()
             .iter()
@@ -72,7 +73,7 @@ pub struct UnspendableAccountTargets {
 
 pub struct UnspendableAccountInputs {
     salt: &'static [u8],
-    secret: &'static str,
+    secret: [u8; 32],
 }
 
 impl CircuitFragment for UnspendableAccount {
@@ -82,9 +83,8 @@ impl CircuitFragment for UnspendableAccount {
     /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let account_id = builder.add_virtual_hash();
-        // NOTE: Each target representing a byte of a string. Can we allocate size dynamically?
-        let salt = builder.add_virtual_targets(10);
-        let secret = builder.add_virtual_targets(8);
+        let salt = builder.add_virtual_targets(8);
+        let secret = builder.add_virtual_targets(32);
 
         let mut preimage = Vec::with_capacity(salt.len() + secret.len());
         preimage.extend(salt.clone());
@@ -96,7 +96,6 @@ impl CircuitFragment for UnspendableAccount {
         }
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
-        // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
         let generated_account =
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
@@ -124,7 +123,7 @@ impl CircuitFragment for UnspendableAccount {
         for (i, byte) in inputs.salt.iter().enumerate() {
             pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
         }
-        for (i, byte) in inputs.secret.as_bytes().iter().enumerate() {
+        for (i, byte) in inputs.secret.iter().enumerate() {
             pw.set_target(targets.secret[i], F::from_canonical_u8(*byte))?;
         }
 
@@ -204,7 +203,7 @@ impl Nullifier {
     pub fn new(entrinsic_tx: u64, secret: &str) -> Self {
         // Calculate the preimage by concatanating [`SALT`], the entrinsic_tx and the secret value.
         let entrinsic_tx = entrinsic_tx.to_be_bytes();
-        let secret = secret.as_bytes().to_vec();
+        let secret = string_to_padded_32_byte_array(secret);
         let preimage: Vec<F> = [SALT, &entrinsic_tx, &secret]
             .concat()
             .iter()
@@ -228,7 +227,7 @@ pub struct NullifierTargets {
 pub struct NullifierInputs {
     salt: &'static [u8],
     tx_id: u64,
-    secret: &'static str,
+    secret: [u8; 32],
 }
 
 impl CircuitFragment for Nullifier {
@@ -239,10 +238,9 @@ impl CircuitFragment for Nullifier {
     /// extrinsic_index + secret))`
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let hash = builder.add_virtual_hash();
-        // NOTE: Each target representing a byte of a string. Can we allocate size dynamically?
-        let salt = builder.add_virtual_targets(10);
+        let salt = builder.add_virtual_targets(8);
         let tx_id = builder.add_virtual_targets(8);
-        let secret = builder.add_virtual_targets(8);
+        let secret = builder.add_virtual_targets(32);
 
         let mut preimage = Vec::with_capacity(salt.len() + tx_id.len() + secret.len());
         preimage.extend(salt.clone());
@@ -255,7 +253,6 @@ impl CircuitFragment for Nullifier {
         }
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
-        // NOTE: We assume that addresses are generated with Poseidon. Should double-check sometime.
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
         let computed_hash =
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
@@ -286,7 +283,7 @@ impl CircuitFragment for Nullifier {
         for (i, byte) in inputs.tx_id.to_be_bytes().iter().enumerate() {
             pw.set_target(targets.tx_id[i], F::from_canonical_u8(*byte))?;
         }
-        for (i, byte) in inputs.secret.as_bytes().iter().enumerate() {
+        for (i, byte) in inputs.secret.iter().enumerate() {
             pw.set_target(targets.secret[i], F::from_canonical_u8(*byte))?;
         }
 
@@ -361,13 +358,16 @@ pub fn verify(
     let amounts_targets = public_inputs.amounts.circuit(&mut builder);
     let nullifier_targets = public_inputs.nullifier.circuit(&mut builder);
 
+    // Convert the secret to its byte representation and pad as necessary.
+    let unspendable_secret = string_to_padded_32_byte_array(private_inputs.unspendable_secret);
+
     let mut pw = PartialWitness::new();
     private_inputs.unspendable_account.fill_targets(
         &mut pw,
         unspendable_account_targets,
         UnspendableAccountInputs {
             salt: SALT,
-            secret: private_inputs.unspendable_secret,
+            secret: unspendable_secret,
         },
     )?;
     public_inputs
@@ -379,7 +379,7 @@ pub fn verify(
         NullifierInputs {
             salt: SALT,
             tx_id: public_inputs.extrinsic_index,
-            secret: private_inputs.unspendable_secret,
+            secret: unspendable_secret,
         },
     )?;
 
@@ -391,6 +391,14 @@ pub fn verify(
     data.verify(proof.clone())?;
 
     Ok(proof)
+}
+
+/// Converts a string its representation in a 32 byte array.
+fn string_to_padded_32_byte_array(string: &str) -> [u8; 32] {
+    let string_bytes = string.as_bytes();
+    let mut array = [0u8; 32];
+    array[..string_bytes.len()].copy_from_slice(string_bytes);
+    array
 }
 
 #[cfg(test)]
@@ -417,11 +425,11 @@ mod tests {
             let fee_amount = 10;
             let extrinsic_index = 0;
 
-            let unspendable_secret = "~secret~";
+            let unspendable_secret = "secret";
 
             Self {
                 public_inputs: WormholeProofPublicInputs::new(
-                    Nullifier::new(extrinsic_index, "~secret~"),
+                    Nullifier::new(extrinsic_index, unspendable_secret),
                     Amounts::new(funding_tx_amount, exit_amount, fee_amount),
                     extrinsic_index,
                 ),
@@ -453,7 +461,7 @@ mod tests {
     #[should_panic]
     fn build_and_verify_proof_wrong_unspendable_secret() {
         let mut inputs = WormholeProofTestInputs::default();
-        inputs.private_inputs.unspendable_secret = "~terces~";
+        inputs.private_inputs.unspendable_secret = "terces";
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
 
