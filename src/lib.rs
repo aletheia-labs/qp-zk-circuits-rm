@@ -22,8 +22,8 @@ pub type Digest = [F; 4];
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
 
-// TODO: Correct constants.
 pub const ACCOUNT_HASH_SIZE: usize = 16;
+pub const SECRET_NUM_BYTES: usize = 32;
 pub const SALT: &[u8] = "wormhole".as_bytes();
 
 pub type AccountId = Digest;
@@ -73,7 +73,7 @@ pub struct UnspendableAccountTargets {
 
 pub struct UnspendableAccountInputs {
     salt: &'static [u8],
-    secret: [u8; 32],
+    secret: [u8; SECRET_NUM_BYTES],
 }
 
 impl CircuitFragment for UnspendableAccount {
@@ -84,7 +84,7 @@ impl CircuitFragment for UnspendableAccount {
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let account_id = builder.add_virtual_hash();
         let salt = builder.add_virtual_targets(8);
-        let secret = builder.add_virtual_targets(32);
+        let secret = builder.add_virtual_targets(SECRET_NUM_BYTES);
 
         let mut preimage = Vec::with_capacity(salt.len() + secret.len());
         preimage.extend(salt.clone());
@@ -222,7 +222,7 @@ pub struct NullifierTargets {
 pub struct NullifierInputs {
     salt: &'static [u8],
     tx_id: u64,
-    secret: [u8; 32],
+    secret: [u8; SECRET_NUM_BYTES],
 }
 
 impl CircuitFragment for Nullifier {
@@ -235,7 +235,7 @@ impl CircuitFragment for Nullifier {
         let hash = builder.add_virtual_hash_public_input();
         let salt = builder.add_virtual_targets(8);
         let tx_id = builder.add_virtual_targets(8);
-        let secret = builder.add_virtual_targets(32);
+        let secret = builder.add_virtual_targets(SECRET_NUM_BYTES);
 
         let mut preimage = Vec::with_capacity(salt.len() + tx_id.len() + secret.len());
         preimage.extend(salt.clone());
