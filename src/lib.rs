@@ -1,9 +1,6 @@
 use plonky2::{
     field::{goldilocks_field::GoldilocksField, types::Field},
-    hash::{
-        hash_types::{HashOut, HashOutTarget},
-        poseidon::PoseidonHash,
-    },
+    hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
     iop::{
         target::Target,
         witness::{PartialWitness, WitnessWrite},
@@ -82,7 +79,7 @@ impl CircuitFragment for UnspendableAccount {
 
     /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let account_id = builder.add_virtual_hash();
+        let account_id = builder.add_virtual_hash_public_input();
         let salt = builder.add_virtual_targets(8);
         let secret = builder.add_virtual_targets(SECRET_NUM_BYTES);
 
@@ -96,9 +93,7 @@ impl CircuitFragment for UnspendableAccount {
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
 
         // Assert that hashes are equal.
-        for i in 0..4 {
-            builder.connect(account_id.elements[i], generated_account.elements[i]);
-        }
+        builder.connect_hashes(generated_account, account_id);
 
         UnspendableAccountTargets {
             account_id,
@@ -114,7 +109,7 @@ impl CircuitFragment for UnspendableAccount {
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         // Unspendable account circuit values.
-        pw.set_hash_target(targets.account_id, HashOut::from_partial(&self.account_id))?;
+        pw.set_hash_target(targets.account_id, self.account_id.into())?;
         for (i, byte) in inputs.salt.iter().enumerate() {
             pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
         }
@@ -251,9 +246,7 @@ impl CircuitFragment for Nullifier {
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
 
         // Assert that hashes are equal.
-        for i in 0..4 {
-            builder.connect(hash.elements[i], computed_hash.elements[i]);
-        }
+        builder.connect_hashes(computed_hash, hash);
 
         NullifierTargets {
             hash,
@@ -269,7 +262,7 @@ impl CircuitFragment for Nullifier {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        pw.set_hash_target(targets.hash, HashOut::from_partial(&self.hash))?;
+        pw.set_hash_target(targets.hash, self.hash.into())?;
         for (i, byte) in inputs.salt.iter().enumerate() {
             pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
         }
