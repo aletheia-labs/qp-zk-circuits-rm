@@ -392,7 +392,14 @@ mod tests {
 
     use super::*;
 
-    const EXPECTED_PUBLIC_INPUTS: [u64; 15] = [
+    /// An array containing all the values of the inputs that we expect to be exposed as public.
+    /// The format is as follows:
+    /// \[AccountId (Hash elements) | Amounts (3xF) | Nullifier (Hash elements) | TxId (8 bytes)\]
+    const EXPECTED_PUBLIC_INPUTS: [u64; 19] = [
+        7457191426581024878,
+        11405048483280340706,
+        7057747067867402609,
+        15727825555040390790,
         100,
         90,
         10,
