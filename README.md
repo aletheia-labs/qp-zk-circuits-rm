@@ -31,8 +31,8 @@ nix --experimental-features 'nix-command flakes' develop
 Clone the repository:
 
 ```sh
-git clone https://github.com/eqlabs/zk-wormholes
-cd zk-wormholes
+git clone https://github.com/Resonance-Network/wormhole-prover
+cd wormhole-prover
 ```
 
 ## Testing
