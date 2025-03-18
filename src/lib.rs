@@ -125,19 +125,19 @@ impl CircuitFragment for UnspendableAccount {
 
 pub struct Amounts {
     /// The amount that a wormhole deposit adress was funded with
-    funding_tx_amount: u64,
+    funding_tx_amount: F,
     /// Amount to be given to exit_account
-    exit_amount: u64,
+    exit_amount: F,
     /// Amount to be given to miner
-    fee_amount: u64,
+    fee_amount: F,
 }
 
 impl Amounts {
     pub fn new(funding_tx_amount: u64, exit_amount: u64, fee_amount: u64) -> Self {
         Self {
-            funding_tx_amount,
-            exit_amount,
-            fee_amount,
+            funding_tx_amount: F::from_canonical_u64(funding_tx_amount),
+            exit_amount: F::from_canonical_u64(exit_amount),
+            fee_amount: F::from_canonical_u64(fee_amount),
         }
     }
 }
@@ -178,12 +178,9 @@ impl CircuitFragment for Amounts {
         targets: Self::Targets,
         _inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        pw.set_target(
-            targets.funding_tx_amount,
-            F::from_canonical_u64(self.funding_tx_amount),
-        )?;
-        pw.set_target(targets.exit_amount, F::from_canonical_u64(self.exit_amount))?;
-        pw.set_target(targets.fee_amount, F::from_canonical_u64(self.fee_amount))
+        pw.set_target(targets.funding_tx_amount, self.funding_tx_amount)?;
+        pw.set_target(targets.exit_amount, self.exit_amount)?;
+        pw.set_target(targets.fee_amount, self.fee_amount)
     }
 }
 
@@ -469,7 +466,7 @@ mod tests {
     #[should_panic]
     fn build_and_verify_proof_non_zero_sum_amounts() {
         let mut inputs = WormholeProofTestInputs::default();
-        inputs.public_inputs.amounts.exit_amount = 200;
+        inputs.public_inputs.amounts.exit_amount = F::from_noncanonical_u64(200);
 
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
