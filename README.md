@@ -1,4 +1,4 @@
-# zk-wormholes
+# wormhole-prover
 
 ## Prerequisites
 
