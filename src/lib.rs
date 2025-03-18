@@ -21,6 +21,8 @@ pub type F = GoldilocksField;
 
 pub const ACCOUNT_HASH_SIZE: usize = 16;
 pub const SECRET_NUM_BYTES: usize = 32;
+/// A unique salt used to differentiate this domain from others.
+// TODO: Consider using an even more specific domain seperator.
 pub const SALT: &[u8] = "wormhole".as_bytes();
 
 pub type AccountId = Digest;
