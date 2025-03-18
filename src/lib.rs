@@ -190,11 +190,11 @@ pub struct Nullifier {
 }
 
 impl Nullifier {
-    pub fn new(entrinsic_tx: u64, secret: &str) -> Self {
-        // Calculate the preimage by concatanating [`SALT`], the entrinsic_tx and the secret value.
-        let entrinsic_tx = entrinsic_tx.to_be_bytes();
+    pub fn new(intrinsic_tx: u64, secret: &str) -> Self {
+        // Calculate the preimage by concatanating [`SALT`], the intrinsic_tx and the secret value.
+        let intrinsic_tx = intrinsic_tx.to_be_bytes();
         let secret = string_to_padded_32_byte_array(secret);
-        let preimage: Vec<F> = [SALT, &entrinsic_tx, &secret]
+        let preimage: Vec<F> = [SALT, &intrinsic_tx, &secret]
             .concat()
             .iter()
             .map(|v| F::from_canonical_u8(*v))
