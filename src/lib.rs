@@ -13,13 +13,14 @@ use plonky2::{
     },
 };
 
+mod storage_proof;
+
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
 pub type Digest = [F; 4];
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
 
-pub const ACCOUNT_HASH_SIZE: usize = 16;
 pub const SECRET_NUM_BYTES: usize = 32;
 /// A unique salt used to differentiate this domain from others.
 // TODO: Consider using an even more specific domain seperator.
