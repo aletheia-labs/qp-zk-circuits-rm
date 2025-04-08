@@ -22,8 +22,7 @@ impl ProofNode {
 
 pub struct StorageProofInputs {
     root_hash: [u8; 32],
-    proof_data: Vec<&'static [u8]>,
-    hash_indexes: Vec<usize>,
+    proof_data: Vec<Vec<u8>>,
 }
 
 pub struct StorageProofTargets {
@@ -65,7 +64,8 @@ impl CircuitFragment for StorageProof {
             prev_node = Some(ProofNode::new(node_hash, *hash_index));
         }
 
-        // TODO: Compare root hashes.
+        let proof_root = prev_node.expect("no root node was found in proof data");
+        builder.connect_hashes(proof_root.hash, root_hash);
 
         StorageProofTargets {
             root_hash,
@@ -79,7 +79,16 @@ impl CircuitFragment for StorageProof {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        pw.set_hash_target(targets.root_hash, bytes32_to_hashout(inputs.root_hash))
+        pw.set_hash_target(targets.root_hash, bytes32_to_hashout(inputs.root_hash))?;
+        for (i, proof_node) in inputs.proof_data.into_iter().enumerate() {
+            let proof_node: Vec<F> = proof_node
+                .iter()
+                .map(|&byte| F::from_canonical_u8(byte))
+                .collect();
+            pw.set_target_arr(&targets.proof_data[i], &proof_node)?;
+        }
+
+        Ok(())
     }
 }
 
