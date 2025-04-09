@@ -21,8 +21,7 @@ impl ProofNode {
 }
 
 pub struct StorageProofInputs {
-    root_hash: [u8; 32],
-    proof_data: Vec<Vec<u8>>,
+    pub root_hash: [u8; 32],
 }
 
 pub struct StorageProofTargets {
@@ -30,8 +29,10 @@ pub struct StorageProofTargets {
     proof_data: Vec<Vec<Target>>,
 }
 
+#[derive(Debug, Default)]
 pub struct StorageProof {
     hash_indexes: Vec<usize>,
+    proof: Vec<Vec<u8>>,
 }
 
 impl CircuitFragment for StorageProof {
@@ -80,7 +81,7 @@ impl CircuitFragment for StorageProof {
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         pw.set_hash_target(targets.root_hash, bytes32_to_hashout(inputs.root_hash))?;
-        for (i, proof_node) in inputs.proof_data.into_iter().enumerate() {
+        for (i, proof_node) in self.proof.iter().enumerate() {
             let proof_node: Vec<F> = proof_node
                 .iter()
                 .map(|&byte| F::from_canonical_u8(byte))

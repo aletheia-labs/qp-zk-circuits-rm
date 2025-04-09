@@ -12,6 +12,7 @@ use plonky2::{
         proof::ProofWithPublicInputs,
     },
 };
+use storage_proof::{StorageProof, StorageProofInputs};
 
 mod storage_proof;
 
@@ -279,41 +280,50 @@ impl CircuitFragment for Nullifier {
 
 pub struct WormholeProofPublicInputs {
     // Prevents double-claims (double hash of salt + txid + secret)
-    nullifier: Nullifier,
+    pub nullifier: Nullifier,
     // Account the user wishes to withdraw to
     // exit_account: AccountId,
-    amounts: Amounts,
+    pub amounts: Amounts,
     // Used to verify the transaction success event
-    // storage_root: [u8; 32],
+    pub storage_root: [u8; 32],
     // The order that the tx was mined in, also referred to as `tx_id`
-    extrinsic_index: u64,
+    pub extrinsic_index: u64,
 }
 
 impl WormholeProofPublicInputs {
-    pub fn new(nullifier: Nullifier, amounts: Amounts, extrinsic_index: u64) -> Self {
+    pub fn new(
+        nullifier: Nullifier,
+        amounts: Amounts,
+        storage_root: [u8; 32],
+        extrinsic_index: u64,
+    ) -> Self {
         Self {
             nullifier,
             amounts,
+            storage_root,
             extrinsic_index,
         }
     }
 }
 
 pub struct WormholeProofPrivateInputs {
-    // Event that resulted from funding the unspendable address
-    // funding_event: Vec<u8>,
     /// Unspendable account
-    unspendable_account: UnspendableAccount,
-    // Proves balance
-    // storage_proof: Vec<u8>,
+    pub unspendable_account: UnspendableAccount,
+    /// Proves balance
+    pub storage_proof: StorageProof,
     /// Secret value preimage of unspendable_address, this is also used in the nullifier computation
-    unspendable_secret: &'static str,
+    pub unspendable_secret: &'static str,
 }
 
 impl WormholeProofPrivateInputs {
-    pub fn new(unspendable_account: UnspendableAccount, unspendable_secret: &'static str) -> Self {
+    pub fn new(
+        unspendable_account: UnspendableAccount,
+        storage_proof: StorageProof,
+        unspendable_secret: &'static str,
+    ) -> Self {
         Self {
             unspendable_account,
+            storage_proof,
             unspendable_secret,
         }
     }
@@ -343,6 +353,7 @@ pub fn verify(
     let unspendable_account_targets = private_inputs.unspendable_account.circuit(&mut builder);
     let amounts_targets = public_inputs.amounts.circuit(&mut builder);
     let nullifier_targets = public_inputs.nullifier.circuit(&mut builder);
+    let storage_proof_targets = private_inputs.storage_proof.circuit(&mut builder);
 
     // Convert the secret to its byte representation and pad as necessary.
     let unspendable_secret = string_to_padded_32_byte_array(private_inputs.unspendable_secret);
@@ -366,6 +377,13 @@ pub fn verify(
             salt: SALT,
             tx_id: public_inputs.extrinsic_index,
             secret: unspendable_secret,
+        },
+    )?;
+    private_inputs.storage_proof.fill_targets(
+        &mut pw,
+        storage_proof_targets,
+        StorageProofInputs {
+            root_hash: public_inputs.storage_root,
         },
     )?;
 
@@ -432,14 +450,18 @@ mod tests {
 
             let unspendable_secret = "secret";
 
+            let storage_proof = StorageProof::default();
+
             Self {
                 public_inputs: WormholeProofPublicInputs::new(
                     Nullifier::new(extrinsic_index, unspendable_secret),
                     Amounts::new(funding_tx_amount, exit_amount, fee_amount),
+                    [0u8; 32],
                     extrinsic_index,
                 ),
                 private_inputs: WormholeProofPrivateInputs::new(
                     UnspendableAccount::new(unspendable_secret),
+                    storage_proof,
                     unspendable_secret,
                 ),
             }
