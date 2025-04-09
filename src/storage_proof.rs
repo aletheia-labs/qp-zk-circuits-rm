@@ -25,14 +25,23 @@ pub struct StorageProofInputs {
 }
 
 pub struct StorageProofTargets {
-    root_hash: HashOutTarget,
-    proof_data: Vec<Vec<Target>>,
+    pub root_hash: HashOutTarget,
+    pub proof_data: Vec<Vec<Target>>,
 }
 
 #[derive(Debug, Default)]
 pub struct StorageProof {
     hash_indexes: Vec<usize>,
     proof: Vec<Vec<u8>>,
+}
+
+impl StorageProof {
+    pub fn new(hash_indexes: Vec<usize>, proof: Vec<Vec<u8>>) -> Self {
+        StorageProof {
+            hash_indexes,
+            proof,
+        }
+    }
 }
 
 impl CircuitFragment for StorageProof {

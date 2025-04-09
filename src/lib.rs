@@ -1,20 +1,20 @@
+use amounts::Amounts;
+use nullifier::{Nullifier, NullifierInputs};
 use plonky2::{
-    field::{goldilocks_field::GoldilocksField, types::Field},
-    hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
-    iop::{
-        target::Target,
-        witness::{PartialWitness, WitnessWrite},
-    },
+    field::goldilocks_field::GoldilocksField,
+    iop::witness::PartialWitness,
     plonk::{
-        circuit_builder::CircuitBuilder,
-        circuit_data::CircuitConfig,
-        config::{Hasher, PoseidonGoldilocksConfig},
-        proof::ProofWithPublicInputs,
+        circuit_builder::CircuitBuilder, circuit_data::CircuitConfig,
+        config::PoseidonGoldilocksConfig, proof::ProofWithPublicInputs,
     },
 };
 use storage_proof::{StorageProof, StorageProofInputs};
+use unspendable_account::{UnspendableAccount, UnspendableAccountInputs};
 
+pub mod amounts;
+mod nullifier;
 mod storage_proof;
+mod unspendable_account;
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
@@ -26,8 +26,6 @@ pub const SECRET_NUM_BYTES: usize = 32;
 /// A unique salt used to differentiate this domain from others.
 // TODO: Consider using an even more specific domain seperator.
 pub const SALT: &[u8] = "wormhole".as_bytes();
-
-pub type AccountId = Digest;
 
 pub trait CircuitFragment {
     type PrivateInputs;
@@ -41,241 +39,6 @@ pub trait CircuitFragment {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()>;
-}
-pub struct UnspendableAccount {
-    account_id: AccountId,
-}
-
-impl UnspendableAccount {
-    pub fn new(secret: &str) -> Self {
-        // First, convert the secret to its bytes representation.
-        let secret = string_to_padded_32_byte_array(secret);
-
-        // Calculate the preimage by concatanating [`SALT`] and the secret value.
-        let preimage: Vec<F> = [SALT, &secret]
-            .concat()
-            .iter()
-            .map(|v| F::from_canonical_u8(*v))
-            .collect();
-
-        // Hash twice to get the account id.
-        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
-        let account_id = PoseidonHash::hash_no_pad(&inner_hash).elements;
-
-        Self { account_id }
-    }
-}
-
-pub struct UnspendableAccountTargets {
-    account_id: HashOutTarget,
-    salt: Vec<Target>,
-    secret: Vec<Target>,
-}
-
-pub struct UnspendableAccountInputs {
-    salt: &'static [u8],
-    secret: [u8; SECRET_NUM_BYTES],
-}
-
-impl CircuitFragment for UnspendableAccount {
-    type PrivateInputs = UnspendableAccountInputs;
-    type Targets = UnspendableAccountTargets;
-
-    /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let account_id = builder.add_virtual_hash_public_input();
-        let salt = builder.add_virtual_targets(8);
-        let secret = builder.add_virtual_targets(SECRET_NUM_BYTES);
-
-        let mut preimage = Vec::with_capacity(salt.len() + secret.len());
-        preimage.extend(salt.clone());
-        preimage.extend(secret.clone());
-
-        // Compute the `generated_account` by double-hashing the preimage (salt + secret).
-        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
-        let generated_account =
-            builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
-
-        // Assert that hashes are equal.
-        builder.connect_hashes(generated_account, account_id);
-
-        UnspendableAccountTargets {
-            account_id,
-            salt,
-            secret,
-        }
-    }
-
-    fn fill_targets(
-        &self,
-        pw: &mut PartialWitness<F>,
-        targets: Self::Targets,
-        inputs: Self::PrivateInputs,
-    ) -> anyhow::Result<()> {
-        // Unspendable account circuit values.
-        pw.set_hash_target(targets.account_id, self.account_id.into())?;
-        for (i, byte) in inputs.salt.iter().enumerate() {
-            pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
-        }
-        for (i, byte) in inputs.secret.iter().enumerate() {
-            pw.set_target(targets.secret[i], F::from_canonical_u8(*byte))?;
-        }
-
-        Ok(())
-    }
-}
-
-pub struct Amounts {
-    /// The amount that a wormhole deposit adress was funded with
-    funding_tx_amount: F,
-    /// Amount to be given to exit_account
-    exit_amount: F,
-    /// Amount to be given to miner
-    fee_amount: F,
-}
-
-impl Amounts {
-    pub fn new(funding_tx_amount: u64, exit_amount: u64, fee_amount: u64) -> Self {
-        Self {
-            funding_tx_amount: F::from_canonical_u64(funding_tx_amount),
-            exit_amount: F::from_canonical_u64(exit_amount),
-            fee_amount: F::from_canonical_u64(fee_amount),
-        }
-    }
-}
-
-pub struct AmountsTargets {
-    funding_tx_amount: Target,
-    exit_amount: Target,
-    fee_amount: Target,
-}
-
-impl CircuitFragment for Amounts {
-    type PrivateInputs = ();
-    type Targets = AmountsTargets;
-
-    /// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let funding_tx_amount = builder.add_virtual_target();
-        let exit_amount = builder.add_virtual_target();
-        let fee_amount = builder.add_virtual_target();
-
-        builder.register_public_input(funding_tx_amount);
-        builder.register_public_input(exit_amount);
-        builder.register_public_input(fee_amount);
-
-        let sum = builder.add(exit_amount, fee_amount);
-        builder.connect(sum, funding_tx_amount);
-
-        AmountsTargets {
-            funding_tx_amount,
-            exit_amount,
-            fee_amount,
-        }
-    }
-
-    fn fill_targets(
-        &self,
-        pw: &mut PartialWitness<F>,
-        targets: Self::Targets,
-        _inputs: Self::PrivateInputs,
-    ) -> anyhow::Result<()> {
-        pw.set_target(targets.funding_tx_amount, self.funding_tx_amount)?;
-        pw.set_target(targets.exit_amount, self.exit_amount)?;
-        pw.set_target(targets.fee_amount, self.fee_amount)
-    }
-}
-
-pub struct Nullifier {
-    hash: Digest,
-}
-
-impl Nullifier {
-    pub fn new(intrinsic_tx: u64, secret: &str) -> Self {
-        // Calculate the preimage by concatanating [`SALT`], the intrinsic_tx and the secret value.
-        let intrinsic_tx = intrinsic_tx.to_be_bytes();
-        let secret = string_to_padded_32_byte_array(secret);
-        let preimage: Vec<F> = [SALT, &intrinsic_tx, &secret]
-            .concat()
-            .iter()
-            .map(|v| F::from_canonical_u8(*v))
-            .collect();
-
-        let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
-        let hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
-
-        Self { hash }
-    }
-}
-
-pub struct NullifierTargets {
-    hash: HashOutTarget,
-    salt: Vec<Target>,
-    tx_id: Vec<Target>,
-    secret: Vec<Target>,
-}
-
-pub struct NullifierInputs {
-    salt: &'static [u8],
-    tx_id: u64,
-    secret: [u8; SECRET_NUM_BYTES],
-}
-
-impl CircuitFragment for Nullifier {
-    type PrivateInputs = NullifierInputs;
-    type Targets = NullifierTargets;
-
-    /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
-    /// extrinsic_index + secret))`
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let hash = builder.add_virtual_hash_public_input();
-        let salt = builder.add_virtual_targets(8);
-        let tx_id = builder.add_virtual_targets(8);
-        let secret = builder.add_virtual_targets(SECRET_NUM_BYTES);
-
-        let mut preimage = Vec::with_capacity(salt.len() + tx_id.len() + secret.len());
-        preimage.extend(salt.clone());
-        preimage.extend(tx_id.clone());
-        preimage.extend(secret.clone());
-
-        // Expose tx id as a public input.
-        builder.register_public_inputs(&tx_id);
-
-        // Compute the `generated_account` by double-hashing the preimage (salt + secret).
-        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
-        let computed_hash =
-            builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
-
-        // Assert that hashes are equal.
-        builder.connect_hashes(computed_hash, hash);
-
-        NullifierTargets {
-            hash,
-            salt,
-            tx_id,
-            secret,
-        }
-    }
-
-    fn fill_targets(
-        &self,
-        pw: &mut PartialWitness<F>,
-        targets: Self::Targets,
-        inputs: Self::PrivateInputs,
-    ) -> anyhow::Result<()> {
-        pw.set_hash_target(targets.hash, self.hash.into())?;
-        for (i, byte) in inputs.salt.iter().enumerate() {
-            pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
-        }
-        for (i, byte) in inputs.tx_id.to_be_bytes().iter().enumerate() {
-            pw.set_target(targets.tx_id[i], F::from_canonical_u8(*byte))?;
-        }
-        for (i, byte) in inputs.secret.iter().enumerate() {
-            pw.set_target(targets.secret[i], F::from_canonical_u8(*byte))?;
-        }
-
-        Ok(())
-    }
 }
 
 pub struct WormholeProofPublicInputs {
@@ -362,10 +125,7 @@ pub fn verify(
     private_inputs.unspendable_account.fill_targets(
         &mut pw,
         unspendable_account_targets,
-        UnspendableAccountInputs {
-            salt: SALT,
-            secret: unspendable_secret,
-        },
+        UnspendableAccountInputs::new(unspendable_secret),
     )?;
     public_inputs
         .amounts
@@ -373,11 +133,7 @@ pub fn verify(
     public_inputs.nullifier.fill_targets(
         &mut pw,
         nullifier_targets,
-        NullifierInputs {
-            salt: SALT,
-            tx_id: public_inputs.extrinsic_index,
-            secret: unspendable_secret,
-        },
+        NullifierInputs::new(public_inputs.extrinsic_index, unspendable_secret),
     )?;
     private_inputs.storage_proof.fill_targets(
         &mut pw,
@@ -407,7 +163,7 @@ fn string_to_padded_32_byte_array(string: &str) -> [u8; 32] {
 
 #[cfg(test)]
 mod tests {
-    use plonky2::field::types::PrimeField64;
+    use plonky2::field::types::{Field, PrimeField64};
 
     use super::*;
 
@@ -450,13 +206,14 @@ mod tests {
 
             let unspendable_secret = "secret";
 
+            let root_hash = [0u8; 32];
             let storage_proof = StorageProof::default();
 
             Self {
                 public_inputs: WormholeProofPublicInputs::new(
                     Nullifier::new(extrinsic_index, unspendable_secret),
                     Amounts::new(funding_tx_amount, exit_amount, fee_amount),
-                    [0u8; 32],
+                    root_hash,
                     extrinsic_index,
                 ),
                 private_inputs: WormholeProofPrivateInputs::new(
