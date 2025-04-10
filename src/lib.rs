@@ -1,7 +1,7 @@
 use amounts::Amounts;
 use nullifier::{Nullifier, NullifierInputs};
 use plonky2::{
-    field::goldilocks_field::GoldilocksField,
+    field::{goldilocks_field::GoldilocksField, types::Field},
     iop::witness::PartialWitness,
     plonk::{
         circuit_builder::CircuitBuilder, circuit_data::CircuitConfig,
@@ -125,7 +125,7 @@ pub fn verify(
     private_inputs.unspendable_account.fill_targets(
         &mut pw,
         unspendable_account_targets,
-        UnspendableAccountInputs::new(unspendable_secret),
+        UnspendableAccountInputs::new(private_inputs.unspendable_secret)?,
     )?;
     public_inputs
         .amounts
@@ -159,6 +159,22 @@ fn string_to_padded_32_byte_array(string: &str) -> [u8; 32] {
     let mut array = [0u8; 32];
     array[..string_bytes.len()].copy_from_slice(string_bytes);
     array
+}
+
+pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
+    const BYTES_PER_ELEMENT: usize = 8;
+
+    let mut field_elements: Vec<F> = Vec::new();
+    for chunk in input.chunks(BYTES_PER_ELEMENT) {
+        let mut bytes = [0u8; 8];
+        bytes[..chunk.len()].copy_from_slice(chunk);
+        // Convert the chunk to a field element
+        let value = u64::from_le_bytes(bytes);
+        let field_element = F::from_noncanonical_u64(value);
+        field_elements.push(field_element);
+    }
+
+    field_elements
 }
 
 #[cfg(test)]
@@ -217,7 +233,7 @@ mod tests {
                     extrinsic_index,
                 ),
                 private_inputs: WormholeProofPrivateInputs::new(
-                    UnspendableAccount::new(unspendable_secret),
+                    UnspendableAccount::new(unspendable_secret).unwrap(),
                     storage_proof,
                     unspendable_secret,
                 ),

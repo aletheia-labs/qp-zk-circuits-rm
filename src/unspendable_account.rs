@@ -1,5 +1,4 @@
 use plonky2::{
-    field::types::Field,
     hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
     iop::{
         target::Target,
@@ -8,50 +7,55 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::{
-    string_to_padded_32_byte_array, CircuitFragment, Digest, D, F, SALT, SECRET_NUM_BYTES,
-};
+use crate::{slice_to_field_elements, CircuitFragment, Digest, D, F};
 
 pub type AccountId = Digest;
 
 pub struct UnspendableAccount {
     account_id: AccountId,
+    preimage_num_targets: usize,
 }
 
 impl UnspendableAccount {
-    pub fn new(secret: &str) -> Self {
+    pub fn new(preimage: &str) -> anyhow::Result<Self> {
         // First, convert the secret to its bytes representation.
-        let secret = string_to_padded_32_byte_array(secret);
+        let decoded = hex::decode(preimage)?;
 
-        // Calculate the preimage by concatanating [`SALT`] and the secret value.
-        let preimage: Vec<F> = [SALT, &secret]
-            .concat()
-            .iter()
-            .map(|v| F::from_canonical_u8(*v))
-            .collect();
+        println!("-- Debug --");
+        println!("Preimage: {:?}\n", preimage);
+
+        let preimage = slice_to_field_elements(&decoded);
 
         // Hash twice to get the account id.
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
         let account_id = PoseidonHash::hash_no_pad(&inner_hash).elements;
 
-        Self { account_id }
+        println!("-- Field Elements --");
+        println!("Preimage: {:?}", preimage);
+        println!("Inner Hash: {:?}", inner_hash);
+        println!("AccountId: {:?}", account_id);
+
+        Ok(Self {
+            account_id,
+            preimage_num_targets: preimage.len(),
+        })
     }
 }
 
 pub struct UnspendableAccountTargets {
     account_id: HashOutTarget,
-    salt: Vec<Target>,
-    secret: Vec<Target>,
+    preimage: Vec<Target>,
 }
 
 pub struct UnspendableAccountInputs {
-    salt: &'static [u8],
-    secret: [u8; SECRET_NUM_BYTES],
+    preimage: Vec<F>,
 }
 
 impl UnspendableAccountInputs {
-    pub fn new(secret: [u8; SECRET_NUM_BYTES]) -> Self {
-        Self { salt: SALT, secret }
+    pub fn new(preimage: &str) -> anyhow::Result<Self> {
+        let decoded = hex::decode(preimage)?;
+        let preimage = slice_to_field_elements(&decoded);
+        Ok(Self { preimage })
     }
 }
 
@@ -62,15 +66,10 @@ impl CircuitFragment for UnspendableAccount {
     /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
     fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let account_id = builder.add_virtual_hash_public_input();
-        let salt = builder.add_virtual_targets(8);
-        let secret = builder.add_virtual_targets(SECRET_NUM_BYTES);
-
-        let mut preimage = Vec::with_capacity(salt.len() + secret.len());
-        preimage.extend(salt.clone());
-        preimage.extend(secret.clone());
+        let preimage = builder.add_virtual_targets(self.preimage_num_targets);
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
-        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage);
+        let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
         let generated_account =
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(inner_hash.elements.to_vec());
 
@@ -79,8 +78,7 @@ impl CircuitFragment for UnspendableAccount {
 
         UnspendableAccountTargets {
             account_id,
-            salt,
-            secret,
+            preimage,
         }
     }
 
@@ -92,13 +90,41 @@ impl CircuitFragment for UnspendableAccount {
     ) -> anyhow::Result<()> {
         // Unspendable account circuit values.
         pw.set_hash_target(targets.account_id, self.account_id.into())?;
-        for (i, byte) in inputs.salt.iter().enumerate() {
-            pw.set_target(targets.salt[i], F::from_canonical_u8(*byte))?;
-        }
-        for (i, byte) in inputs.secret.iter().enumerate() {
-            pw.set_target(targets.secret[i], F::from_canonical_u8(*byte))?;
+        for (i, element) in inputs.preimage.into_iter().enumerate() {
+            pw.set_target(targets.preimage[i], element)?;
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use plonky2::plonk::circuit_data::CircuitConfig;
+
+    use crate::C;
+
+    use super::*;
+
+    const PREIMAGE: &str = "e5d30b9a4c2a6f81e5d30b9a4c2a6f81e5d30b9a4c2a6f81e5d30b9a4c2a6f81";
+
+    #[test]
+    fn build_and_verify_proof() {
+        let config = CircuitConfig::standard_recursion_config();
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+        let mut pw = PartialWitness::new();
+
+        let unspendable_account = UnspendableAccount::new(PREIMAGE).unwrap();
+        let targets = unspendable_account.circuit(&mut builder);
+
+        let inputs = UnspendableAccountInputs::new(PREIMAGE).unwrap();
+        unspendable_account
+            .fill_targets(&mut pw, targets, inputs)
+            .unwrap();
+
+        let data = builder.build::<C>();
+
+        let proof = data.prove(pw).unwrap();
+        data.verify(proof).unwrap();
     }
 }
