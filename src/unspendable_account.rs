@@ -18,22 +18,13 @@ pub struct UnspendableAccount {
 
 impl UnspendableAccount {
     pub fn new(preimage: &str) -> anyhow::Result<Self> {
-        // First, convert the secret to its bytes representation.
+        // First, convert the preimage to its representation as field elements.
         let decoded = hex::decode(preimage)?;
-
-        println!("-- Debug --");
-        println!("Preimage: {:?}\n", preimage);
-
         let preimage = slice_to_field_elements(&decoded);
 
         // Hash twice to get the account id.
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
         let account_id = PoseidonHash::hash_no_pad(&inner_hash).elements;
-
-        println!("-- Field Elements --");
-        println!("Preimage: {:?}", preimage);
-        println!("Inner Hash: {:?}", inner_hash);
-        println!("AccountId: {:?}", account_id);
 
         Ok(Self {
             account_id,
