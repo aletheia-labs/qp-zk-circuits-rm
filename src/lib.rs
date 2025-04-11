@@ -118,9 +118,6 @@ pub fn verify(
     let nullifier_targets = public_inputs.nullifier.circuit(&mut builder);
     let storage_proof_targets = private_inputs.storage_proof.circuit(&mut builder);
 
-    // Convert the secret to its byte representation and pad as necessary.
-    let unspendable_secret = string_to_padded_32_byte_array(private_inputs.unspendable_secret);
-
     let mut pw = PartialWitness::new();
     private_inputs.unspendable_account.fill_targets(
         &mut pw,
@@ -133,7 +130,8 @@ pub fn verify(
     public_inputs.nullifier.fill_targets(
         &mut pw,
         nullifier_targets,
-        NullifierInputs::new(public_inputs.extrinsic_index, unspendable_secret),
+        // TODO: Need to refactor inputs to take in preimages separately.
+        NullifierInputs::new(private_inputs.unspendable_secret)?,
     )?;
     private_inputs.storage_proof.fill_targets(
         &mut pw,
@@ -153,14 +151,7 @@ pub fn verify(
     Ok(proof)
 }
 
-/// Converts a string its representation in a 32 byte array.
-fn string_to_padded_32_byte_array(string: &str) -> [u8; 32] {
-    let string_bytes = string.as_bytes();
-    let mut array = [0u8; 32];
-    array[..string_bytes.len()].copy_from_slice(string_bytes);
-    array
-}
-
+/// Converts a given slice into its field element representation.
 pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
     const BYTES_PER_ELEMENT: usize = 8;
 
@@ -227,7 +218,7 @@ mod tests {
 
             Self {
                 public_inputs: WormholeProofPublicInputs::new(
-                    Nullifier::new(extrinsic_index, unspendable_secret),
+                    Nullifier::new(unspendable_secret).unwrap(),
                     Amounts::new(funding_tx_amount, exit_amount, fee_amount),
                     root_hash,
                     extrinsic_index,
