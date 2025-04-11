@@ -9,6 +9,7 @@ use plonky2::{
 
 use crate::{CircuitFragment, D, F};
 
+#[derive(Debug)]
 struct ProofNode {
     hash: HashOutTarget,
     index: usize,
@@ -20,10 +21,12 @@ impl ProofNode {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct StorageProofInputs {
     pub root_hash: [u8; 32],
 }
 
+#[derive(Debug)]
 pub struct StorageProofTargets {
     pub root_hash: HashOutTarget,
     pub proof_data: Vec<Vec<Target>>,

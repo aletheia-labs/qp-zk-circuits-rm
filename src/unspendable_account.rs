@@ -11,6 +11,7 @@ use crate::{slice_to_field_elements, CircuitFragment, Digest, D, F};
 
 pub type AccountId = Digest;
 
+#[derive(Debug, Default)]
 pub struct UnspendableAccount {
     account_id: AccountId,
     preimage_num_targets: usize,
@@ -33,11 +34,13 @@ impl UnspendableAccount {
     }
 }
 
+#[derive(Debug)]
 pub struct UnspendableAccountTargets {
     account_id: HashOutTarget,
     preimage: Vec<Target>,
 }
 
+#[derive(Debug, Default)]
 pub struct UnspendableAccountInputs {
     preimage: Vec<F>,
 }

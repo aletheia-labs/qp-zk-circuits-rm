@@ -41,6 +41,7 @@ pub trait CircuitFragment {
     ) -> anyhow::Result<()>;
 }
 
+#[derive(Debug)]
 pub struct WormholeProofPublicInputs {
     // Prevents double-claims (double hash of salt + txid + secret)
     pub nullifier: Nullifier,
@@ -69,6 +70,7 @@ impl WormholeProofPublicInputs {
     }
 }
 
+#[derive(Debug)]
 pub struct WormholeProofPrivateInputs {
     /// Unspendable account
     pub unspendable_account: UnspendableAccount,

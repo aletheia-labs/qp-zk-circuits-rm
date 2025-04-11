@@ -9,6 +9,7 @@ use plonky2::{
 
 use crate::{CircuitFragment, D, F};
 
+#[derive(Debug)]
 pub struct Amounts {
     /// The amount that a wormhole deposit adress was funded with
     pub funding_tx_amount: F,
@@ -28,6 +29,7 @@ impl Amounts {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct AmountsTargets {
     pub funding_tx_amount: Target,
     pub exit_amount: Target,

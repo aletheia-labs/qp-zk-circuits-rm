@@ -9,6 +9,7 @@ use plonky2::{
 
 use crate::{slice_to_field_elements, CircuitFragment, Digest, D, F};
 
+#[derive(Debug, Default)]
 pub struct Nullifier {
     hash: Digest,
     preimage_num_targets: usize,
@@ -30,11 +31,13 @@ impl Nullifier {
     }
 }
 
+#[derive(Debug)]
 pub struct NullifierTargets {
     hash: HashOutTarget,
     preimage: Vec<Target>,
 }
 
+#[derive(Debug, Default)]
 pub struct NullifierInputs {
     preimage: Vec<F>,
 }
