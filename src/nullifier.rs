@@ -80,3 +80,32 @@ impl CircuitFragment for Nullifier {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod test {
+    use plonky2::plonk::circuit_data::CircuitConfig;
+
+    use crate::C;
+
+    use super::*;
+
+    const PREIMAGE: &str = "e5d30b9a4c2a6f81e5d30b9a4c2a6f81e5d30b9a4c2a6f81e5d30b9a4c2a6f81";
+
+    #[test]
+    fn build_and_verify_proof() {
+        let config = CircuitConfig::standard_recursion_config();
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+        let mut pw = PartialWitness::new();
+
+        let nullifier = Nullifier::new(PREIMAGE).unwrap();
+        let targets = nullifier.circuit(&mut builder);
+
+        let inputs = NullifierInputs::new(PREIMAGE).unwrap();
+        nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
+
+        let data = builder.build::<C>();
+
+        let proof = data.prove(pw).unwrap();
+        data.verify(proof).unwrap();
+    }
+}
