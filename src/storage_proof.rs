@@ -1,5 +1,4 @@
 use plonky2::{
-    field::types::Field,
     hash::{
         hash_types::{HashOut, HashOutTarget},
         poseidon::PoseidonHash,
@@ -7,17 +6,16 @@ use plonky2::{
     iop::{target::Target, witness::WitnessWrite},
 };
 
-use crate::{CircuitFragment, D, F};
+use crate::{slice_to_field_elements, CircuitFragment, D, F};
 
 #[derive(Debug)]
 struct ProofNode {
     hash: HashOutTarget,
-    index: usize,
 }
 
 impl ProofNode {
-    pub fn new(hash: HashOutTarget, index: usize) -> Self {
-        ProofNode { hash, index }
+    pub fn new(hash: HashOutTarget) -> Self {
+        ProofNode { hash }
     }
 }
 
@@ -30,19 +28,33 @@ pub struct StorageProofInputs {
 pub struct StorageProofTargets {
     pub root_hash: HashOutTarget,
     pub proof_data: Vec<Vec<Target>>,
+    pub hashes: Vec<Option<HashOutTarget>>,
 }
 
 #[derive(Debug, Default)]
 pub struct StorageProof {
-    hash_indexes: Vec<usize>,
     proof: Vec<Vec<u8>>,
+    hashes: Vec<Option<Vec<u8>>>,
 }
 
 impl StorageProof {
-    pub fn new(hash_indexes: Vec<usize>, proof: Vec<Vec<u8>>) -> Self {
+    /// The input is a storage proof as a tuple where each part is split at the index where the child node's
+    /// hash, if any, appears within this proof node
+    pub fn new(proof: Vec<(Vec<u8>, Option<Vec<u8>>)>) -> Self {
+        let mut constructed_proof = Vec::with_capacity(proof.len());
+        let mut hashes = Vec::with_capacity(proof.len());
+        for (mut proof_node, hash) in proof.into_iter() {
+            // If hash is not empty this is not a leaf node and we need to store the bytes
+            // for a comparision later.
+            if let Some(hash) = hash.clone() {
+                proof_node.extend(hash);
+            }
+            constructed_proof.push(proof_node);
+            hashes.push(hash);
+        }
         StorageProof {
-            hash_indexes,
-            proof,
+            proof: constructed_proof,
+            hashes,
         }
     }
 }
@@ -56,25 +68,28 @@ impl CircuitFragment for StorageProof {
         builder: &mut plonky2::plonk::circuit_builder::CircuitBuilder<F, D>,
     ) -> Self::Targets {
         let root_hash = builder.add_virtual_hash_public_input();
-        let num_nodes = self.hash_indexes.len();
+        let num_nodes = self.proof.len();
         let mut proof_data = Vec::with_capacity(num_nodes);
         for _ in 0..num_nodes {
-            let node = builder.add_virtual_targets(num_nodes);
-            proof_data.push(node);
+            let proof_node = builder.add_virtual_targets(num_nodes);
+            proof_data.push(proof_node);
+        }
+
+        let mut hashes = Vec::with_capacity(num_nodes);
+        for hash in &self.hashes {
+            let hash = hash.as_ref().map(|_hash| builder.add_virtual_hash());
+            hashes.push(hash);
         }
 
         // Setup constraints.
         let mut prev_node: Option<ProofNode> = None;
-        for (node, hash_index) in proof_data.iter().zip(&self.hash_indexes) {
-            if let Some(prev) = prev_node {
-                // TODO: Find node hash in parents raw bytes using the provided index.
-                let indexed_bytes = &node[prev.index..(prev.index + 32)];
-                let stored_child_hash = HashOutTarget::from_vec(indexed_bytes.to_vec());
-                builder.connect_hashes(stored_child_hash, prev.hash);
+        for (node, hash) in proof_data.iter().zip(hashes.iter()) {
+            if let (Some(hash), Some(prev_node)) = (hash, prev_node) {
+                builder.connect_hashes(prev_node.hash, *hash);
             }
 
             let node_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(node.to_vec());
-            prev_node = Some(ProofNode::new(node_hash, *hash_index));
+            prev_node = Some(ProofNode::new(node_hash));
         }
 
         let proof_root = prev_node.expect("no root node was found in proof data");
@@ -83,6 +98,7 @@ impl CircuitFragment for StorageProof {
         StorageProofTargets {
             root_hash,
             proof_data,
+            hashes,
         }
     }
 
@@ -92,29 +108,24 @@ impl CircuitFragment for StorageProof {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        pw.set_hash_target(targets.root_hash, bytes32_to_hashout(inputs.root_hash))?;
+        pw.set_hash_target(targets.root_hash, slice_to_hashout(&inputs.root_hash))?;
         for (i, proof_node) in self.proof.iter().enumerate() {
-            let proof_node: Vec<F> = proof_node
-                .iter()
-                .map(|&byte| F::from_canonical_u8(byte))
-                .collect();
+            let proof_node = slice_to_field_elements(proof_node);
             pw.set_target_arr(&targets.proof_data[i], &proof_node)?;
+        }
+        for (i, hash) in self.hashes.iter().enumerate() {
+            if let (Some(hash_t), Some(hash)) = (targets.hashes[i], hash) {
+                let hash = slice_to_hashout(hash);
+                pw.set_hash_target(hash_t, hash)?;
+            }
         }
 
         Ok(())
     }
 }
 
-fn bytes32_to_hashout(bytes: [u8; 32]) -> HashOut<F> {
-    use std::convert::TryInto;
-
-    let elements = (0..4)
-        .map(|i| {
-            let chunk: [u8; 8] = bytes[i * 8..(i + 1) * 8].try_into().unwrap();
-            F::from_canonical_u64(u64::from_le_bytes(chunk))
-        })
-        .collect::<Vec<_>>();
-
+fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
+    let elements = slice_to_field_elements(slice);
     HashOut {
         elements: elements.try_into().unwrap(),
     }
