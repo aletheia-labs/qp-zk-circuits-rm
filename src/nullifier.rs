@@ -86,29 +86,57 @@ impl CircuitFragment for Nullifier {
 
 #[cfg(test)]
 mod test {
-    use plonky2::plonk::circuit_data::CircuitConfig;
+    use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
-    use crate::C;
+    use crate::{
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
+        C,
+    };
 
     use super::*;
 
-    const PREIMAGE: &str = "e5d30b9a4c2a6f81e5d30b9a4c2a6f81e5d30b9a4c2a6f81e5d30b9a4c2a6f81";
+    fn run_test(
+        nullifier: Nullifier,
+        inputs: NullifierInputs,
+    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let targets = nullifier.circuit(&mut builder);
+
+        nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
+        build_and_prove_test(builder, pw)
+    }
+
+    const PREIMAGE: &str =
+        "776f726d686f6c650908804f8983b91253f3b2e4d49b71afc8e2c707608d9ae456990fb21591037f";
 
     #[test]
     fn build_and_verify_proof() {
-        let config = CircuitConfig::standard_recursion_config();
-        let mut builder = CircuitBuilder::<F, D>::new(config);
-        let mut pw = PartialWitness::new();
-
         let nullifier = Nullifier::new(PREIMAGE).unwrap();
-        let targets = nullifier.circuit(&mut builder);
-
         let inputs = NullifierInputs::new(PREIMAGE).unwrap();
-        nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
+        run_test(nullifier, inputs).unwrap();
+    }
 
-        let data = builder.build::<C>();
+    #[test]
+    fn invalid_preimage_fails_proof() {
+        let valid_nullifier = Nullifier::new(PREIMAGE).unwrap();
 
-        let proof = data.prove(pw).unwrap();
-        data.verify(proof).unwrap();
+        // Use a different preimage to create incorrect inputs
+        let mut invalid_bytes = hex::decode(PREIMAGE).unwrap();
+        invalid_bytes[0] ^= 0xFF; // flip first byte
+        let invalid_hex = hex::encode(invalid_bytes);
+
+        let bad_inputs = NullifierInputs::new(&invalid_hex).unwrap();
+
+        let res = run_test(valid_nullifier, bad_inputs);
+        assert!(res.is_err(),);
+    }
+
+    #[test]
+    fn all_zero_preimage_is_valid_and_hashes() {
+        let preimage_bytes = vec![0u8; 64];
+        let hex_preimage = hex::encode(preimage_bytes);
+
+        let nullifier = Nullifier::new(&hex_preimage).unwrap();
+        assert!(!nullifier.hash.to_vec().iter().all(|x| x.is_zero()));
     }
 }
