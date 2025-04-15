@@ -171,10 +171,29 @@ pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use plonky2::field::types::{Field, PrimeField64};
 
     use super::*;
+
+    /// Convenince function for initializing a test circuit environment.
+    pub fn setup_test_builder_and_witness() -> (CircuitBuilder<F, D>, PartialWitness<F>) {
+        let config = CircuitConfig::standard_recursion_config();
+        let builder = CircuitBuilder::<F, D>::new(config);
+        let pw = PartialWitness::new();
+
+        (builder, pw)
+    }
+
+    /// Convenince function for building and verifying a test function. The circuit is assumed to
+    /// have been setup prior to calling this function.
+    pub fn build_and_prove_test(
+        builder: CircuitBuilder<F, D>,
+        pw: PartialWitness<F>,
+    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+        let data = builder.build::<C>();
+        data.prove(pw)
+    }
 
     /// An array containing all the values of the inputs that we expect to be exposed as public.
     /// The format is as follows:
