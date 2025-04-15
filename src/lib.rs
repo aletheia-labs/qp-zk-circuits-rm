@@ -172,7 +172,7 @@ pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
 
 #[cfg(test)]
 pub mod tests {
-    use plonky2::field::types::{Field, PrimeField64};
+    use plonky2::field::types::PrimeField64;
 
     use super::*;
 
@@ -274,15 +274,6 @@ pub mod tests {
     fn build_and_verify_proof_wrong_unspendable_secret() {
         let mut inputs = WormholeProofTestInputs::default();
         inputs.private_inputs.unspendable_secret = "terces";
-        verify(inputs.public_inputs, inputs.private_inputs).unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn build_and_verify_proof_non_zero_sum_amounts() {
-        let mut inputs = WormholeProofTestInputs::default();
-        inputs.public_inputs.amounts.exit_amount = F::from_noncanonical_u64(200);
-
         verify(inputs.public_inputs, inputs.private_inputs).unwrap();
     }
 }

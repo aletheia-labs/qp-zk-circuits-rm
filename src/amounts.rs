@@ -71,3 +71,67 @@ impl CircuitFragment for Amounts {
         pw.set_target(targets.fee_amount, self.fee_amount)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use plonky2::plonk::proof::ProofWithPublicInputs;
+
+    use crate::{
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
+        C,
+    };
+
+    use super::*;
+
+    fn run_test(amounts: Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let targets = amounts.circuit(&mut builder);
+
+        amounts.fill_targets(&mut pw, targets, ()).unwrap();
+        build_and_prove_test(builder, pw)
+    }
+
+    #[test]
+    fn test_valid_amounts() {
+        let amounts = Amounts::new(100, 60, 40);
+        run_test(amounts).unwrap();
+    }
+
+    #[test]
+    fn test_invalid_amounts_wrong_sum() {
+        let amounts = Amounts::new(100, 50, 30);
+        let result = run_test(amounts);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_zero_amounts() {
+        let amounts = Amounts::new(0, 0, 0);
+        run_test(amounts).unwrap();
+    }
+
+    #[test]
+    fn test_exit_only_no_fee() {
+        let amounts = Amounts::new(100, 100, 0);
+        run_test(amounts).unwrap();
+    }
+
+    #[test]
+    fn test_fee_only_no_exit() {
+        let amounts = Amounts::new(100, 0, 100);
+        run_test(amounts).unwrap();
+    }
+
+    #[test]
+    fn test_max_amounts() {
+        let amounts = Amounts::new(u64::MAX, u64::MAX - 1, 1);
+        run_test(amounts).unwrap();
+    }
+
+    #[test]
+    fn test_invalid_large_fee() {
+        let amounts = Amounts::new(100, 10, 100);
+        let result = run_test(amounts);
+        assert!(result.is_err());
+    }
+}
