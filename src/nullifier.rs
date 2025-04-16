@@ -120,9 +120,9 @@ mod test {
     fn invalid_preimage_fails_proof() {
         let valid_nullifier = Nullifier::new(PREIMAGE).unwrap();
 
-        // Use a different preimage to create incorrect inputs
+        // Flip the first byte in the first node hash.
         let mut invalid_bytes = hex::decode(PREIMAGE).unwrap();
-        invalid_bytes[0] ^= 0xFF; // flip first byte
+        invalid_bytes[0] ^= 0xFF;
         let invalid_hex = hex::encode(invalid_bytes);
 
         let bad_inputs = NullifierInputs::new(&invalid_hex).unwrap();

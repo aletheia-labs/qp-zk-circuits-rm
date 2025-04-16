@@ -4,7 +4,6 @@ use plonky2::{
         poseidon::PoseidonHash,
     },
     iop::{target::Target, witness::WitnessWrite},
-    plonk::config::Hasher,
 };
 
 use crate::{slice_to_field_elements, CircuitFragment, D, F};
@@ -44,13 +43,6 @@ impl StorageProof {
             // We make sure to convert to field elements after an eventual hash has been appended.
             let proof_node = slice_to_field_elements(&proof_node_bytes);
             let hash = slice_to_field_elements(&right)[..4].to_vec();
-
-            println!("PROOF_NODE: {:?}", proof_node);
-            println!(
-                "HASHED_NODE: {:?}",
-                PoseidonHash::hash_no_pad(&proof_node).elements
-            );
-            println!("HASH: {:?}", hash);
 
             constructed_proof.push(proof_node);
             hashes.push(hash);
@@ -109,7 +101,6 @@ impl CircuitFragment for StorageProof {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        println!("ROOT HASH: {:?}: ", slice_to_hashout(&inputs.root_hash));
         pw.set_hash_target(targets.root_hash, slice_to_hashout(&inputs.root_hash))?;
         for (i, proof_node) in self.proof.iter().enumerate() {
             pw.set_target_arr(&targets.proof_data[i], proof_node)?;
@@ -168,8 +159,6 @@ mod tests {
             root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
         };
 
-        println!("{:?}", storage_proof);
-
         run_test(storage_proof, inputs).unwrap();
     }
 
@@ -191,7 +180,7 @@ mod tests {
 
         // Flip the first byte in the first node hash.
         let mut right_bytes = hex::decode(tampered_proof[0].1).unwrap();
-        right_bytes[0] ^= 0xff;
+        right_bytes[0] ^= 0xFF;
         let right_bytes_hex = hex::encode(&right_bytes);
         tampered_proof[0].1 = &right_bytes_hex;
 

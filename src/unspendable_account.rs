@@ -159,7 +159,7 @@ mod test {
         let (preimage, wrong_address) = (PREIMAGES[0], ADRESSES[1]);
         let mut unspendable_account = UnspendableAccount::new(preimage).unwrap();
 
-        // Override the correct hash with the wrong one
+        // Override the correct hash with the wrong one.
         let wrong_hash = slice_to_field_elements(&hex::decode(wrong_address).unwrap());
         unspendable_account.account_id = wrong_hash.try_into().unwrap();
 
