@@ -18,36 +18,32 @@ pub struct StorageProofInputs {
 pub struct StorageProofTargets {
     pub root_hash: HashOutTarget,
     pub proof_data: Vec<Vec<Target>>,
-    pub hashes: Vec<Option<HashOutTarget>>,
+    pub hashes: Vec<HashOutTarget>,
 }
 
 #[derive(Debug, Default)]
 pub struct StorageProof {
     proof: Vec<Vec<F>>,
-    hashes: Vec<Option<Vec<F>>>,
+    hashes: Vec<Vec<F>>,
 }
 
 impl StorageProof {
     /// The input is a storage proof as a tuple where each part is split at the index where the child node's
     /// hash, if any, appears within this proof node
-    pub fn new(proof: Vec<(&str, Option<&str>)>) -> anyhow::Result<Self> {
+    pub fn new(proof: Vec<(&str, &str)>) -> anyhow::Result<Self> {
         // First construct the proof and the hash array
         let mut constructed_proof = Vec::with_capacity(proof.len());
         let mut hashes = Vec::with_capacity(proof.len());
         for (left, right) in proof.into_iter() {
             // Decode hex data.
             let mut proof_node_bytes = hex::decode(left)?;
-            let right = right.map(|h| hex::decode(h).unwrap());
+            let right = hex::decode(right)?;
 
-            // If hash is not empty this is not a leaf node and we need to store the bytes
-            // for a comparision later.
-            if let Some(right) = right.clone() {
-                proof_node_bytes.extend(right);
-            }
+            proof_node_bytes.extend(right.clone());
 
             // We make sure to convert to field elements after an eventual hash has been appended.
             let proof_node = slice_to_field_elements(&proof_node_bytes);
-            let hash = right.map(|h| slice_to_field_elements(&h)[..4].to_vec());
+            let hash = slice_to_field_elements(&right)[..4].to_vec();
 
             println!("PROOF_NODE: {:?}", proof_node);
             println!(
@@ -84,8 +80,8 @@ impl CircuitFragment for StorageProof {
         }
 
         let mut hashes = Vec::with_capacity(num_nodes);
-        for hash in &self.hashes {
-            let hash = hash.as_ref().map(|_hash| builder.add_virtual_hash());
+        for _ in 0..num_nodes {
+            let hash = builder.add_virtual_hash();
             hashes.push(hash);
         }
 
@@ -98,7 +94,7 @@ impl CircuitFragment for StorageProof {
                 builder.connect_hashes(node_hash, prev_hash);
             }
 
-            prev_hash = *hash;
+            prev_hash = Some(*hash);
             println!("{:?}", prev_hash);
         }
 
@@ -125,10 +121,8 @@ impl CircuitFragment for StorageProof {
             pw.set_target_arr(&targets.proof_data[i], proof_node)?;
         }
         for (i, hash) in self.hashes.iter().enumerate() {
-            if let (Some(hash_t), Some(hash)) = (targets.hashes[i], hash) {
-                let hash = HashOut::from_vec(hash[0..4].to_vec());
-                pw.set_hash_target(hash_t, hash)?;
-            }
+            let hash = HashOut::from_vec(hash[0..4].to_vec());
+            pw.set_hash_target(targets.hashes[i], hash)?;
         }
 
         Ok(())
@@ -168,10 +162,10 @@ mod tests {
 
     // const ROOT_HASH: &str = "2c490f3108efc8b9cd547db5fefec5cf49f7f55033bd917e622d3149f5b2e7c4";
     const ROOT_HASH: &str = "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad";
-    const STORAGE_PROOF: [(&str, Option<&str>); 3] = [
-        ("802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c961173080ea73ee6d8e4a9eaa0bdc2c9ac5f92f3496db397ccf45a36a8204cf43228897738033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80", Some("fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd9979807b0915aa481d80b2a4ed3b8095850bc5c71f27376285aadad77d32d953eaed83")),
-        ("9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080", Some("7d2a0433270079343ebcb735a692272c38706bda9009e2d2362a0150d8b53136")),
-        ("80840080", Some("0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad80fb21730f3ee7d68537e10e9ebcdb88ee2c9c34873a7d92d40d94869430122feb")),
+    const STORAGE_PROOF: [(&str, &str); 3] = [
+        ("802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c961173080ea73ee6d8e4a9eaa0bdc2c9ac5f92f3496db397ccf45a36a8204cf43228897738033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80", "fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd9979807b0915aa481d80b2a4ed3b8095850bc5c71f27376285aadad77d32d953eaed83"),
+        ("9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080", "7d2a0433270079343ebcb735a692272c38706bda9009e2d2362a0150d8b53136"),
+        ("80840080", "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad80fb21730f3ee7d68537e10e9ebcdb88ee2c9c34873a7d92d40d94869430122feb"),
     ];
 
     #[test]
