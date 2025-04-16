@@ -22,9 +22,9 @@ pub struct Amounts {
 impl Amounts {
     pub fn new(funding_tx_amount: u64, exit_amount: u64, fee_amount: u64) -> Self {
         Self {
-            funding_tx_amount: F::from_canonical_u64(funding_tx_amount),
-            exit_amount: F::from_canonical_u64(exit_amount),
-            fee_amount: F::from_canonical_u64(fee_amount),
+            funding_tx_amount: F::from_noncanonical_u64(funding_tx_amount),
+            exit_amount: F::from_noncanonical_u64(exit_amount),
+            fee_amount: F::from_noncanonical_u64(fee_amount),
         }
     }
 }
@@ -125,6 +125,13 @@ mod tests {
     #[test]
     fn test_max_amounts() {
         let amounts = Amounts::new(u64::MAX, u64::MAX - 1, 1);
+        run_test(amounts).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_underflow() {
+        let amounts = Amounts::new(0, u64::MAX, 1);
         run_test(amounts).unwrap();
     }
 
