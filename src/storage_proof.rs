@@ -86,21 +86,15 @@ impl CircuitFragment for StorageProof {
         }
 
         // Setup constraints.
-        let mut prev_hash: Option<HashOutTarget> = None;
+        // The first node should be the root node so we initialize `prev_hash` to the provided `root_hash`.
+        let mut prev_hash = root_hash;
         for (node, hash) in proof_data.iter().zip(hashes.iter()) {
             let node_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(node.to_vec());
+            builder.connect_hashes(node_hash, prev_hash);
 
-            if let Some(prev_hash) = prev_hash {
-                builder.connect_hashes(node_hash, prev_hash);
-            }
-
-            prev_hash = Some(*hash);
-            println!("{:?}", prev_hash);
+            // Update `prev_hash` to the hash of the child that's stored within this node.
+            prev_hash = *hash;
         }
-
-        println!("{:?}", prev_hash);
-        let proof_root = prev_hash.expect("no root node was found in proof data");
-        builder.connect_hashes(proof_root, root_hash);
 
         StorageProofTargets {
             root_hash,
@@ -160,10 +154,9 @@ mod tests {
         build_and_prove_test(builder, pw)
     }
 
-    // const ROOT_HASH: &str = "2c490f3108efc8b9cd547db5fefec5cf49f7f55033bd917e622d3149f5b2e7c4";
-    const ROOT_HASH: &str = "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad";
+    const ROOT_HASH: &str = "f8f5347502a46d864cc68990c59da63f61a05e3c15950b3da99cae444f2e8a52";
     const STORAGE_PROOF: [(&str, &str); 3] = [
-        ("802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c961173080ea73ee6d8e4a9eaa0bdc2c9ac5f92f3496db397ccf45a36a8204cf43228897738033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80", "fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd9979807b0915aa481d80b2a4ed3b8095850bc5c71f27376285aadad77d32d953eaed83"),
+        ("802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c9611730803bc4b2764d479f2f6fd28bc8023231abaeca530e4eae41dc0abd9715efd0031d8033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80", "fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd997980b5524cd2cc83f81c64c113875ce77237584d2d59783fdce36a143d40e53ce4a7"),
         ("9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080", "7d2a0433270079343ebcb735a692272c38706bda9009e2d2362a0150d8b53136"),
         ("80840080", "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad80fb21730f3ee7d68537e10e9ebcdb88ee2c9c34873a7d92d40d94869430122feb"),
     ];
@@ -178,5 +171,35 @@ mod tests {
         println!("{:?}", storage_proof);
 
         run_test(storage_proof, inputs).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn invalid_root_hash_fails() {
+        let proof = StorageProof::new(STORAGE_PROOF.to_vec()).unwrap();
+        let inputs = StorageProofInputs {
+            root_hash: [0u8; 32],
+        };
+
+        run_test(proof, inputs).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn tampered_proof_fails() {
+        let mut tampered_proof = STORAGE_PROOF.to_vec();
+
+        // Flip the first byte in the first node hash.
+        let mut right_bytes = hex::decode(tampered_proof[0].1).unwrap();
+        right_bytes[0] ^= 0xff;
+        let right_bytes_hex = hex::encode(&right_bytes);
+        tampered_proof[0].1 = &right_bytes_hex;
+
+        let proof = StorageProof::new(tampered_proof).unwrap();
+        let inputs = StorageProofInputs {
+            root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
+        };
+
+        run_test(proof, inputs).unwrap();
     }
 }
