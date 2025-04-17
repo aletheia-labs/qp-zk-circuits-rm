@@ -195,7 +195,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn fuzz_tampered_proof() {
         let mut rng = rand::thread_rng();
 
