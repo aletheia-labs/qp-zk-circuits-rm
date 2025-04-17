@@ -123,16 +123,15 @@ fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
 
 #[cfg(test)]
 mod tests {
-    use std::panic;
     use plonky2::plonk::proof::ProofWithPublicInputs;
+    use std::panic;
 
+    use super::*;
     use crate::{
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
     use rand::Rng;
-    use hex;
-    use super::*;
 
     fn run_test(
         storage_proof: StorageProof,
@@ -196,7 +195,7 @@ mod tests {
 
     #[test]
     fn fuzz_tampered_proof() {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         // Number of fuzzing iterations
         const FUZZ_ITERATIONS: usize = 1000;
@@ -207,16 +206,16 @@ mod tests {
             let mut tampered_proof = STORAGE_PROOF.to_vec();
 
             // Randomly select a node in the proof to tamper
-            let node_index = rng.gen_range(0..tampered_proof.len());
+            let node_index = rng.random_range(0..tampered_proof.len());
 
             // Decode the hex string of the selected node
-            let mut bytes = hex::decode(&tampered_proof[node_index].1).unwrap();
+            let mut bytes = hex::decode(tampered_proof[node_index].1).unwrap();
 
             // Randomly select a byte to flip
-            let byte_index = rng.gen_range(0..bytes.len());
+            let byte_index = rng.random_range(0..bytes.len());
 
             // Flip random bits in the selected byte (e.g., XOR with a random value)
-            bytes[byte_index] ^= rng.gen_range(1..=255);
+            bytes[byte_index] ^= rng.random_range(1..=255);
 
             // Encode the tampered bytes back to hex
             let tampered_hex = hex::encode(&bytes);
