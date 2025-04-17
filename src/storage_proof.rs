@@ -123,13 +123,15 @@ fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
 
 #[cfg(test)]
 mod tests {
+    use std::panic;
     use plonky2::plonk::proof::ProofWithPublicInputs;
 
     use crate::{
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
-
+    use rand::Rng;
+    use hex;
     use super::*;
 
     fn run_test(
@@ -190,5 +192,60 @@ mod tests {
         };
 
         run_test(proof, inputs).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn fuzz_tampered_proof() {
+        let mut rng = rand::thread_rng();
+
+        // Number of fuzzing iterations
+        const FUZZ_ITERATIONS: usize = 1000;
+        let mut panic_count = 0;
+
+        for i in 0..FUZZ_ITERATIONS {
+            // Clone the original storage proof
+            let mut tampered_proof = STORAGE_PROOF.to_vec();
+
+            // Randomly select a node in the proof to tamper
+            let node_index = rng.gen_range(0..tampered_proof.len());
+
+            // Decode the hex string of the selected node
+            let mut bytes = hex::decode(&tampered_proof[node_index].1).unwrap();
+
+            // Randomly select a byte to flip
+            let byte_index = rng.gen_range(0..bytes.len());
+
+            // Flip random bits in the selected byte (e.g., XOR with a random value)
+            bytes[byte_index] ^= rng.gen::<u8>();
+
+            // Encode the tampered bytes back to hex
+            let tampered_hex = hex::encode(&bytes);
+            tampered_proof[node_index].1 = &tampered_hex;
+
+            // Create the proof and inputs
+            let proof = StorageProof::new(tampered_proof).unwrap();
+            let inputs = StorageProofInputs {
+                root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
+            };
+
+            // Catch panic from run_test
+            let result = panic::catch_unwind(|| {
+                run_test(proof, inputs).unwrap();
+            });
+
+            if result.is_err() {
+                panic_count += 1;
+            } else {
+                // Optionally log cases where tampering didn't cause a panic
+                println!("Iteration {}: No panic occurred for tampered proof", i);
+            }
+        }
+
+        assert_eq!(
+            panic_count, FUZZ_ITERATIONS,
+            "Only {} out of {} iterations panicked",
+            panic_count, FUZZ_ITERATIONS
+        );
     }
 }

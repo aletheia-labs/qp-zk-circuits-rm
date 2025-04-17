@@ -598,4 +598,5 @@ dependencies = [
  "anyhow",
  "hex",
  "plonky2",
+ "rand",
 ]
