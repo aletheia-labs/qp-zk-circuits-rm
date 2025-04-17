@@ -216,7 +216,7 @@ mod tests {
             let byte_index = rng.gen_range(0..bytes.len());
 
             // Flip random bits in the selected byte (e.g., XOR with a random value)
-            bytes[byte_index] ^= rng.gen::<u8>();
+            bytes[byte_index] ^= rng.gen_range(1..=255);
 
             // Encode the tampered bytes back to hex
             let tampered_hex = hex::encode(&bytes);
