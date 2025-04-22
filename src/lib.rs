@@ -12,10 +12,11 @@ use plonky2::{
 use storage_proof::{StorageProof, StorageProofTargets};
 use unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
 
-pub mod amounts;
-pub mod nullifier;
-pub mod storage_proof;
-pub mod unspendable_account;
+mod amounts;
+mod nullifier;
+pub mod prover;
+mod storage_proof;
+mod unspendable_account;
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
