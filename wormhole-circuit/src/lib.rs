@@ -4,7 +4,8 @@ use plonky2::{
     field::{goldilocks_field::GoldilocksField, types::Field},
     iop::witness::PartialWitness,
     plonk::{
-        circuit_builder::CircuitBuilder, circuit_data::CircuitConfig,
+        circuit_builder::CircuitBuilder,
+        circuit_data::{CircuitConfig, ProverCircuitData, VerifierCircuitData},
         config::PoseidonGoldilocksConfig,
     },
 };
@@ -99,6 +100,20 @@ impl Default for WormholeCircuit {
         let targets = CircuitTargets::new(amounts, nullifier, unspendable_account, storage_proof);
 
         Self { builder, targets }
+    }
+}
+
+impl WormholeCircuit {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn build_prover(self) -> ProverCircuitData<F, C, D> {
+        self.builder.build_prover()
+    }
+
+    pub fn build_verifier(self) -> VerifierCircuitData<F, C, D> {
+        self.builder.build_verifier()
     }
 }
 
