@@ -7,12 +7,14 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::{slice_to_field_elements, CircuitFragment, Digest, D, F};
+use crate::{CircuitFragment, D, Digest, F, slice_to_field_elements};
+
+// FIXME: Adjust as needed.
+pub const PREIMAGE_NUM_TARGETS: usize = 5;
 
 #[derive(Debug, Default)]
 pub struct Nullifier {
     hash: Digest,
-    preimage_num_targets: usize,
 }
 
 impl Nullifier {
@@ -24,10 +26,7 @@ impl Nullifier {
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
         let hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
 
-        Ok(Self {
-            hash,
-            preimage_num_targets: preimage.len(),
-        })
+        Ok(Self { hash })
     }
 }
 
@@ -56,9 +55,9 @@ impl CircuitFragment for Nullifier {
 
     /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
     /// extrinsic_index + secret))`
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
+    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let hash = builder.add_virtual_hash_public_input();
-        let preimage = builder.add_virtual_targets(self.preimage_num_targets);
+        let preimage = builder.add_virtual_targets(PREIMAGE_NUM_TARGETS);
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
@@ -89,8 +88,8 @@ mod test {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
     use crate::{
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
     };
 
     use super::*;
@@ -100,7 +99,7 @@ mod test {
         inputs: NullifierInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = nullifier.circuit(&mut builder);
+        let targets = Nullifier::circuit(&mut builder);
 
         nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
         build_and_prove_test(builder, pw)

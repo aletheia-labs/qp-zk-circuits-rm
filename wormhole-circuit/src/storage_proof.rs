@@ -6,7 +6,11 @@ use plonky2::{
     iop::{target::Target, witness::WitnessWrite},
 };
 
-use crate::{slice_to_field_elements, CircuitFragment, D, F};
+use crate::{CircuitFragment, D, F, slice_to_field_elements};
+
+// TODO: Figure out a way to have variable length proofs.
+pub const PROOF_LEN: usize = 4;
+pub const PROOF_NODE_LEN: usize = 128;
 
 #[derive(Debug, Default)]
 pub struct StorageProofInputs {
@@ -60,19 +64,17 @@ impl CircuitFragment for StorageProof {
     type Targets = StorageProofTargets;
 
     fn circuit(
-        &self,
         builder: &mut plonky2::plonk::circuit_builder::CircuitBuilder<F, D>,
     ) -> Self::Targets {
         let root_hash = builder.add_virtual_hash_public_input();
-        let num_nodes = self.proof.len();
-        let mut proof_data = Vec::with_capacity(num_nodes);
-        for node in &self.proof {
-            let proof_node = builder.add_virtual_targets(node.len());
+        let mut proof_data = Vec::with_capacity(PROOF_LEN);
+        for _ in 0..PROOF_LEN {
+            let proof_node = builder.add_virtual_targets(PROOF_NODE_LEN);
             proof_data.push(proof_node);
         }
 
-        let mut hashes = Vec::with_capacity(num_nodes);
-        for _ in 0..num_nodes {
+        let mut hashes = Vec::with_capacity(PROOF_LEN);
+        for _ in 0..PROOF_LEN {
             let hash = builder.add_virtual_hash();
             hashes.push(hash);
         }
@@ -128,8 +130,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
     };
     use rand::Rng;
 
@@ -138,7 +140,7 @@ mod tests {
         inputs: StorageProofInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = storage_proof.circuit(&mut builder);
+        let targets = StorageProof::circuit(&mut builder);
 
         storage_proof
             .fill_targets(&mut pw, targets, inputs)
@@ -148,9 +150,18 @@ mod tests {
 
     const ROOT_HASH: &str = "f8f5347502a46d864cc68990c59da63f61a05e3c15950b3da99cae444f2e8a52";
     const STORAGE_PROOF: [(&str, &str); 3] = [
-        ("802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c9611730803bc4b2764d479f2f6fd28bc8023231abaeca530e4eae41dc0abd9715efd0031d8033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80", "fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd997980b5524cd2cc83f81c64c113875ce77237584d2d59783fdce36a143d40e53ce4a7"),
-        ("9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080", "7d2a0433270079343ebcb735a692272c38706bda9009e2d2362a0150d8b53136"),
-        ("80840080", "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad80fb21730f3ee7d68537e10e9ebcdb88ee2c9c34873a7d92d40d94869430122feb"),
+        (
+            "802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c9611730803bc4b2764d479f2f6fd28bc8023231abaeca530e4eae41dc0abd9715efd0031d8033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80",
+            "fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd997980b5524cd2cc83f81c64c113875ce77237584d2d59783fdce36a143d40e53ce4a7",
+        ),
+        (
+            "9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080",
+            "7d2a0433270079343ebcb735a692272c38706bda9009e2d2362a0150d8b53136",
+        ),
+        (
+            "80840080",
+            "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad80fb21730f3ee7d68537e10e9ebcdb88ee2c9c34873a7d92d40d94869430122feb",
+        ),
     ];
 
     #[test]

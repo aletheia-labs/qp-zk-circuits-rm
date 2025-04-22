@@ -41,7 +41,7 @@ impl CircuitFragment for Amounts {
     type Targets = AmountsTargets;
 
     /// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
+    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let funding_tx_amount = builder.add_virtual_target();
         let exit_amount = builder.add_virtual_target();
         let fee_amount = builder.add_virtual_target();
@@ -77,15 +77,15 @@ mod tests {
     use plonky2::plonk::proof::ProofWithPublicInputs;
 
     use crate::{
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
     };
 
     use super::*;
 
     fn run_test(amounts: Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = amounts.circuit(&mut builder);
+        let targets = Amounts::circuit(&mut builder);
 
         amounts.fill_targets(&mut pw, targets, ()).unwrap();
         build_and_prove_test(builder, pw)

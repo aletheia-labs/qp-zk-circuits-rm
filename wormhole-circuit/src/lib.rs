@@ -1,8 +1,15 @@
+use amounts::{Amounts, AmountsTargets};
+use nullifier::{Nullifier, NullifierTargets};
 use plonky2::{
     field::{goldilocks_field::GoldilocksField, types::Field},
     iop::witness::PartialWitness,
-    plonk::{circuit_builder::CircuitBuilder, config::PoseidonGoldilocksConfig},
+    plonk::{
+        circuit_builder::CircuitBuilder, circuit_data::CircuitConfig,
+        config::PoseidonGoldilocksConfig,
+    },
 };
+use storage_proof::{StorageProof, StorageProofTargets};
+use unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
 
 pub mod amounts;
 pub mod nullifier;
@@ -24,7 +31,7 @@ pub trait CircuitFragment {
     type PrivateInputs;
     type Targets;
 
-    fn circuit(&self, builder: &mut CircuitBuilder<F, D>) -> Self::Targets;
+    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets;
 
     fn fill_targets(
         &self,
@@ -51,9 +58,53 @@ pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
     field_elements
 }
 
+struct CircuitTargets {
+    amounts: AmountsTargets,
+    nullifier: NullifierTargets,
+    unspendable_account: UnspendableAccountTargets,
+    storage_proof: StorageProofTargets,
+}
+
+impl CircuitTargets {
+    fn new(
+        amounts: AmountsTargets,
+        nullifier: NullifierTargets,
+        unspendable_account: UnspendableAccountTargets,
+        storage_proof: StorageProofTargets,
+    ) -> Self {
+        Self {
+            amounts,
+            nullifier,
+            unspendable_account,
+            storage_proof,
+        }
+    }
+}
+
+pub struct WormholeCircuit {
+    builder: CircuitBuilder<F, D>,
+    targets: CircuitTargets,
+}
+
+impl Default for WormholeCircuit {
+    fn default() -> Self {
+        let config = CircuitConfig::standard_recursion_config();
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+
+        // Setup circuits and their targets.
+        let amounts = Amounts::circuit(&mut builder);
+        let nullifier = Nullifier::circuit(&mut builder);
+        let unspendable_account = UnspendableAccount::circuit(&mut builder);
+        let storage_proof = StorageProof::circuit(&mut builder);
+        let targets = CircuitTargets::new(amounts, nullifier, unspendable_account, storage_proof);
+
+        Self { builder, targets }
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
-    use plonky2::plonk::{circuit_data::CircuitConfig, proof::ProofWithPublicInputs};
+    use plonky2::plonk::proof::ProofWithPublicInputs;
 
     use super::*;
 
