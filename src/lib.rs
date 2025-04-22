@@ -60,6 +60,7 @@ pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
     field_elements
 }
 
+#[derive(Debug, Clone)]
 struct CircuitTargets {
     amounts: AmountsTargets,
     nullifier: NullifierTargets,
@@ -107,6 +108,10 @@ impl Default for WormholeCircuit {
 impl WormholeCircuit {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn targets(&self) -> CircuitTargets {
+        self.targets.clone()
     }
 
     pub fn build_prover(self) -> ProverCircuitData<F, C, D> {

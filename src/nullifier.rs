@@ -30,7 +30,7 @@ impl Nullifier {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NullifierTargets {
     hash: HashOutTarget,
     preimage: Vec<Target>,

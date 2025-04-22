@@ -33,7 +33,7 @@ impl UnspendableAccount {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UnspendableAccountTargets {
     account_id: HashOutTarget,
     preimage: Vec<Target>,

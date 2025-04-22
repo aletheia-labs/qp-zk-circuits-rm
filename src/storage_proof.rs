@@ -17,7 +17,13 @@ pub struct StorageProofInputs {
     pub root_hash: [u8; 32],
 }
 
-#[derive(Debug)]
+impl StorageProofInputs {
+    pub fn new(root_hash: [u8; 32]) -> Self {
+        Self { root_hash }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct StorageProofTargets {
     pub root_hash: HashOutTarget,
     pub proof_data: Vec<Vec<Target>>,
