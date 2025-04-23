@@ -37,7 +37,7 @@ impl Default for WormholeProver {
         let partial_witness = PartialWitness::new();
 
         let targets = Some(wormhole_circuit.targets());
-        let circuit_data = wormhole_circuit.builder.build_prover();
+        let circuit_data = wormhole_circuit.build_prover();
 
         Self {
             circuit_data,

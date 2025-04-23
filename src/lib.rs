@@ -17,6 +17,7 @@ mod nullifier;
 pub mod prover;
 mod storage_proof;
 mod unspendable_account;
+pub mod verifier;
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
