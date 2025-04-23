@@ -29,3 +29,20 @@ impl WormholeVerifier {
         self.circuit_data.verify(proof)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::prover::{CircuitInputs, WormholeProver};
+
+    use super::WormholeVerifier;
+
+    #[test]
+    fn verify_simple_proof() {
+        let prover = WormholeProver::new();
+        let inputs = CircuitInputs::default();
+        let proof = prover.commit(inputs).unwrap().prove().unwrap();
+
+        let verifier = WormholeVerifier::new();
+        verifier.verify(proof).unwrap()
+    }
+}

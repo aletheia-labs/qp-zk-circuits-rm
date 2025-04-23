@@ -92,7 +92,7 @@ impl CircuitFragment for UnspendableAccount {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
     use crate::circuit::{

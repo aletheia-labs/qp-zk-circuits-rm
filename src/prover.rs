@@ -103,7 +103,7 @@ impl WormholeProver {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::{CircuitInputs, WormholeProver};
 
     #[test]
