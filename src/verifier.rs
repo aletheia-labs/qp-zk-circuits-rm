@@ -1,6 +1,6 @@
 use plonky2::plonk::{circuit_data::VerifierCircuitData, proof::ProofWithPublicInputs};
 
-use crate::{C, D, F, WormholeCircuit};
+use crate::circuit::{C, D, F, WormholeCircuit};
 
 pub struct WormholeVerifier {
     circuit_data: VerifierCircuitData<F, C, D>,

@@ -6,7 +6,7 @@ use plonky2::{
     iop::{target::Target, witness::WitnessWrite},
 };
 
-use crate::{CircuitFragment, D, F, slice_to_field_elements};
+use super::{CircuitFragment, D, F, slice_to_field_elements};
 
 // TODO: Figure out a way to have variable length proofs.
 pub const PROOF_LEN: usize = 4;
@@ -135,7 +135,7 @@ mod tests {
     use std::panic;
 
     use super::*;
-    use crate::{
+    use crate::circuit::{
         C,
         tests::{build_and_prove_test, setup_test_builder_and_witness},
     };

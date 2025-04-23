@@ -4,7 +4,7 @@ use plonky2::{
     plonk::{circuit_data::ProverCircuitData, proof::ProofWithPublicInputs},
 };
 
-use crate::{
+use crate::circuit::{
     C, CircuitFragment, CircuitTargets, D, F, WormholeCircuit,
     amounts::Amounts,
     nullifier::{Nullifier, NullifierInputs},

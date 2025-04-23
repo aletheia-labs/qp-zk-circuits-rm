@@ -7,7 +7,7 @@ use plonky2::{
     plonk::circuit_builder::CircuitBuilder,
 };
 
-use crate::{CircuitFragment, D, F};
+use super::{CircuitFragment, D, F};
 
 #[derive(Debug, Default)]
 pub struct Amounts {
@@ -74,14 +74,13 @@ impl CircuitFragment for Amounts {
 
 #[cfg(test)]
 mod tests {
-    use plonky2::plonk::proof::ProofWithPublicInputs;
-
-    use crate::{
+    use crate::circuit::{
         C,
         tests::{build_and_prove_test, setup_test_builder_and_witness},
     };
 
     use super::*;
+    use plonky2::plonk::proof::ProofWithPublicInputs;
 
     fn run_test(amounts: Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();

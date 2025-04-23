@@ -7,7 +7,7 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::{CircuitFragment, D, Digest, F, slice_to_field_elements};
+use super::{CircuitFragment, D, Digest, F, slice_to_field_elements};
 
 // FIXME: Adjust as needed.
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
@@ -95,7 +95,7 @@ impl CircuitFragment for UnspendableAccount {
 mod test {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
-    use crate::{
+    use crate::circuit::{
         C,
         tests::{build_and_prove_test, setup_test_builder_and_witness},
     };
