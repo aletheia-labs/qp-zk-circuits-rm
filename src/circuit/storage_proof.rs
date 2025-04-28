@@ -1,16 +1,20 @@
 use plonky2::{
+    field::{extension::Extendable, types::Field},
     hash::{
-        hash_types::{HashOut, HashOutTarget},
+        hash_types::{HashOut, HashOutTarget, RichField},
         poseidon::PoseidonHash,
     },
-    iop::{target::Target, witness::WitnessWrite},
+    iop::{
+        target::{BoolTarget, Target},
+        witness::WitnessWrite,
+    },
+    plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
 use super::{CircuitFragment, D, F, slice_to_field_elements};
 
-// TODO: Figure out a way to have variable length proofs.
-pub const PROOF_LEN: usize = 4;
-pub const PROOF_NODE_LEN: usize = 128;
+pub const MAX_PROOF_LEN: usize = 8;
+pub const PROOF_NODE_MAX_SIZE: usize = 73;
 
 #[derive(Debug, Default)]
 pub struct StorageProofInputs {
@@ -26,6 +30,7 @@ impl StorageProofInputs {
 #[derive(Debug, Clone)]
 pub struct StorageProofTargets {
     pub root_hash: HashOutTarget,
+    pub proof_len: Target,
     pub proof_data: Vec<Vec<Target>>,
     pub hashes: Vec<HashOutTarget>,
 }
@@ -54,6 +59,21 @@ impl StorageProof {
             let proof_node = slice_to_field_elements(&proof_node_bytes);
             let hash = slice_to_field_elements(&right)[..4].to_vec();
 
+            let new_hash = HashOut::from_partial(&hash);
+            // println!("NODE: {:?}", proof_node);
+            // println!("HASHB: {:?}", hash);
+            // println!("HASH ELEM: {:?}", new_hash);
+            // println!("HASH: {:?}", hex::encode(new_hash.to_bytes()));
+            let hash_out = HashOut {
+                elements: [
+                    F::from_canonical_u64(18279005661425429367),
+                    F::from_canonical_u64(8036595141659929488),
+                    F::from_canonical_u64(18290664695719195397),
+                    F::from_canonical_u64(4143836700003426480),
+                ],
+            };
+            // println!("THIS ONE: {:?}", hex::encode(hash_out.to_bytes()));
+
             constructed_proof.push(proof_node);
             hashes.push(hash);
         }
@@ -72,15 +92,19 @@ impl CircuitFragment for StorageProof {
     fn circuit(
         builder: &mut plonky2::plonk::circuit_builder::CircuitBuilder<F, D>,
     ) -> Self::Targets {
+        // Setup targets. Each 8-bytes are represented as their equivalent field element. We also
+        // need to track total proof length to allow for variable length.
+        let proof_len = builder.add_virtual_target();
+
         let root_hash = builder.add_virtual_hash_public_input();
-        let mut proof_data = Vec::with_capacity(PROOF_LEN);
-        for _ in 0..PROOF_LEN {
-            let proof_node = builder.add_virtual_targets(PROOF_NODE_LEN);
+        let mut proof_data = Vec::with_capacity(MAX_PROOF_LEN);
+        for _ in 0..MAX_PROOF_LEN {
+            let proof_node = builder.add_virtual_targets(PROOF_NODE_MAX_SIZE);
             proof_data.push(proof_node);
         }
 
-        let mut hashes = Vec::with_capacity(PROOF_LEN);
-        for _ in 0..PROOF_LEN {
+        let mut hashes = Vec::with_capacity(MAX_PROOF_LEN);
+        for _ in 0..MAX_PROOF_LEN {
             let hash = builder.add_virtual_hash();
             hashes.push(hash);
         }
@@ -88,16 +112,31 @@ impl CircuitFragment for StorageProof {
         // Setup constraints.
         // The first node should be the root node so we initialize `prev_hash` to the provided `root_hash`.
         let mut prev_hash = root_hash;
-        for (node, hash) in proof_data.iter().zip(hashes.iter()) {
-            let node_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(node.to_vec());
-            builder.connect_hashes(node_hash, prev_hash);
+        let n_log = (usize::BITS - (MAX_PROOF_LEN - 1).leading_zeros()) as usize;
+        // println!("{}", n_log);
+        for i in 0..MAX_PROOF_LEN {
+            let node = &proof_data[i];
+            // println!("{:?}", node.len());
+
+            let is_proof_node = is_const_less_than(builder, i, proof_len, n_log);
+            // let i_t = builder.constant(F::from_canonical_usize(i));
+            // builder.range_check(i_t, n_log);
+            let computed_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(node.to_vec());
+
+            for y in 0..4 {
+                let diff = builder.sub(computed_hash.elements[y], prev_hash.elements[y]);
+                let result = builder.mul(diff, is_proof_node.target);
+                let zero = builder.zero();
+                builder.connect(result, zero);
+            }
 
             // Update `prev_hash` to the hash of the child that's stored within this node.
-            prev_hash = *hash;
+            prev_hash = hashes[i];
         }
 
         StorageProofTargets {
             root_hash,
+            proof_len,
             proof_data,
             hashes,
         }
@@ -110,16 +149,109 @@ impl CircuitFragment for StorageProof {
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         pw.set_hash_target(targets.root_hash, slice_to_hashout(&inputs.root_hash))?;
-        for (i, proof_node) in self.proof.iter().enumerate() {
-            pw.set_target_arr(&targets.proof_data[i], proof_node)?;
+        pw.set_target(targets.proof_len, F::from_canonical_usize(self.proof.len()))?;
+        // println!("{}", self.proof.len());
+        for i in 0..MAX_PROOF_LEN {
+            let proof_node = match self.proof.get(i) {
+                Some(node) => node,
+                None => &vec![F::ZERO; PROOF_NODE_MAX_SIZE],
+            };
+
+            // NOTE: Can we avoid cloning?
+            let mut padded_proof_node = proof_node.clone();
+            padded_proof_node.resize(PROOF_NODE_MAX_SIZE, F::ZERO);
+
+            let hash = PoseidonHash::hash_no_pad(&padded_proof_node);
+            // println!("{:?}", hash);
+            // println!("{:?}", padded_proof_node.len());
+            pw.set_target_arr(&targets.proof_data[i], &padded_proof_node)?;
         }
-        for (i, hash) in self.hashes.iter().enumerate() {
-            let hash = HashOut::from_vec(hash[0..4].to_vec());
-            pw.set_hash_target(targets.hashes[i], hash)?;
+        for i in 0..MAX_PROOF_LEN {
+            let hash = match self.hashes.get(i) {
+                Some(hash) => hash,
+                None => &vec![F::ZERO; 4],
+            };
+            // println!("{:?}", hash);
+            pw.set_hash_target(targets.hashes[i], HashOut::from_partial(&hash[..4]))?;
         }
 
         Ok(())
     }
+}
+
+pub fn select_hash<F: RichField + Extendable<D>, const D: usize>(
+    builder: &mut CircuitBuilder<F, D>,
+    selector: BoolTarget,
+    a: HashOutTarget,
+    b: HashOutTarget,
+) -> HashOutTarget {
+    let elements = std::array::from_fn(|i| builder.select(selector, a.elements[i], b.elements[i]));
+    HashOutTarget { elements }
+}
+
+// fn is_const_less_than<F: RichField + Extendable<D>, const D: usize>(
+//     builder: &mut CircuitBuilder<F, D>,
+//     lhs_const: usize,
+//     rhs_target: Target,
+//     n_log: usize,
+// ) -> BoolTarget {
+//     println!("{}", lhs_const);
+//     // proof_len - i
+//     let lhs = builder.constant(F::from_canonical_usize(lhs_const));
+//     let diff = builder.sub(rhs_target, lhs); // diff = rhs - lhs
+//
+//     // Enforce that diff is in range [0, 2^n_log)
+//     builder.range_check(diff, n_log);
+//
+//     // If diff == 0, then lhs == rhs → not less
+//     // So is_less = (diff != 0)
+//     let zero = builder.zero();
+//     let is_zero = builder.is_equal(diff, zero);
+//     builder.not(is_zero)
+// }
+
+// TODO: Double check logic and move to gadgets mod.
+fn is_const_less_than<F: RichField + Extendable<D>, const D: usize>(
+    builder: &mut CircuitBuilder<F, D>,
+    i: usize,
+    proof_len: Target,
+    n_log: usize,
+) -> BoolTarget {
+    let proof_len_bits = builder.split_le(proof_len, n_log);
+    let i_bits: Vec<bool> = (0..n_log).map(|j| ((i >> j) & 1) != 0).collect();
+
+    let mut lt = builder._false();
+    let mut eq = builder._true();
+
+    for j in (0..n_log).rev() {
+        let a = builder.constant_bool(i_bits[j]);
+        let b = proof_len_bits[j];
+
+        let not_a = builder.not(a);
+        let not_a_and_b = builder.and(not_a, b);
+        let this_lt = builder.and(not_a_and_b, eq);
+        lt = builder.or(lt, this_lt);
+
+        let a_xor_b = xor(builder, a, b);
+        let not_xor = builder.not(a_xor_b);
+        eq = builder.and(eq, not_xor);
+    }
+
+    lt
+}
+
+fn xor<F: RichField + Extendable<D>, const D: usize>(
+    builder: &mut CircuitBuilder<F, D>,
+    a: BoolTarget,
+    b: BoolTarget,
+) -> BoolTarget {
+    let a_t = a.target;
+    let b_t = b.target;
+    let ab = builder.mul(a_t, b_t);
+    let two_ab = builder.mul_const(F::from_canonical_u32(2), ab);
+    let a_plus_b = builder.add(a_t, b_t);
+    let xor = builder.sub(a_plus_b, two_ab);
+    BoolTarget::new_unsafe(xor)
 }
 
 fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
@@ -154,19 +286,19 @@ mod tests {
         build_and_prove_test(builder, pw)
     }
 
-    const ROOT_HASH: &str = "f8f5347502a46d864cc68990c59da63f61a05e3c15950b3da99cae444f2e8a52";
+    const ROOT_HASH: &str = "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
     const STORAGE_PROOF: [(&str, &str); 3] = [
         (
-            "802db080583b8a9387ed08ee9b738699abfcbad1b8e29cb7b41cac563d994003c9611730803bc4b2764d479f2f6fd28bc8023231abaeca530e4eae41dc0abd9715efd0031d8033781a97a90f1f06effaad425064faf81a7f63829068f52e66bc6608bc574724806ff21247e3284873ef5c60a8a4f200a14ac57ff4915b76be741327efb0de52cf80",
-            "fdff83c54a927f7017bac61f875ed0be017ccea19030cb1a94707d98544d7bf9803593ea2a1d297a5b3f4f03b97b1a8d4fed67826778c6392905a2891c26cd997980b5524cd2cc83f81c64c113875ce77237584d2d59783fdce36a143d40e53ce4a7",
+            "802cb08072547dce8ca905abf49c9c644951ff048087cc6f4b497fcc6c24e5592da3bc6a80c9f21db91c755ab0e99f00c73c93eb1742e9d8ba3facffa6e5fda8718006e05e80e4faa006b3beae9cb837950c42a2ab760843d05d224dc437b1add4627ddf6b4580",
+            "68ff0ee21014648cb565ea90c578e0d345b51e857ecb71aaa8e307e20655a83680d8496e0fd1b138c06197ed42f322409c66a8abafd87b3256089ea7777495992180966518d63d0d450bdf3a4f16bb755b96e022464082e2cb3cf9072dd9ef7c9b53",
         ),
         (
             "9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080",
-            "7d2a0433270079343ebcb735a692272c38706bda9009e2d2362a0150d8b53136",
+            "91a67194de54f5741ef011a470a09ad4319935c7ddc4ec11f5a9fa75dd173bd8",
         ),
         (
             "80840080",
-            "0926568f0e5ea8bc9626a97c8c8bab6d4b110b05e5c35bb895c0679d8cecc8ad80fb21730f3ee7d68537e10e9ebcdb88ee2c9c34873a7d92d40d94869430122feb",
+            "2febfc925f8398a1cf35c5de15443d3940255e574ce541f7e67a3f86dbc2a98580cbfbed5faf5b9f416c54ee9d0217312d230bcc0cb57c5817dbdd7f7df9006a63",
         ),
     ];
 
@@ -178,6 +310,29 @@ mod tests {
         };
 
         run_test(storage_proof, inputs).unwrap();
+    }
+
+    #[test]
+    fn benchmark() {
+        let storage_proof = StorageProof::new(STORAGE_PROOF.to_vec()).unwrap();
+        let inputs = StorageProofInputs {
+            root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
+        };
+
+        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let targets = StorageProof::circuit(&mut builder);
+
+        storage_proof
+            .fill_targets(&mut pw, targets, inputs)
+            .unwrap();
+
+        let data = builder.build::<C>();
+        println!("{}", data.common.num_gate_constraints);
+        println!("{}", data.common.num_constants);
+        println!("{}", data.common.num_public_inputs);
+        println!("{}", data.common.num_partial_products);
+        println!("{}", data.common.num_lookup_polys);
+        println!("{}", data.common.num_lookup_selectors);
     }
 
     #[test]
@@ -210,6 +365,7 @@ mod tests {
         run_test(proof, inputs).unwrap();
     }
 
+    #[ignore = "performance"]
     #[test]
     fn fuzz_tampered_proof() {
         let mut rng = rand::rng();
