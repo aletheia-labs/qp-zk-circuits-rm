@@ -125,25 +125,25 @@ impl CircuitFragment for StorageProof {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
+        const EMPTY_PROOF_NODE: [F; PROOF_NODE_MAX_SIZE] = [F::ZERO; PROOF_NODE_MAX_SIZE];
+
         pw.set_hash_target(targets.root_hash, slice_to_hashout(&inputs.root_hash))?;
         pw.set_target(targets.proof_len, F::from_canonical_usize(self.proof.len()))?;
+
         for i in 0..MAX_PROOF_LEN {
-            let proof_node = match self.proof.get(i) {
-                Some(node) => node,
-                None => &vec![F::ZERO; PROOF_NODE_MAX_SIZE],
+            match self.proof.get(i) {
+                Some(node) => {
+                    let mut padded_proof_node = node.clone();
+                    padded_proof_node.resize(PROOF_NODE_MAX_SIZE, F::ZERO);
+                    pw.set_target_arr(&targets.proof_data[i], &padded_proof_node)?;
+                }
+                None => pw.set_target_arr(&targets.proof_data[i], &EMPTY_PROOF_NODE)?,
             };
-
-            // NOTE: Can we avoid cloning?
-            let mut padded_proof_node = proof_node.clone();
-            padded_proof_node.resize(PROOF_NODE_MAX_SIZE, F::ZERO);
-
-            pw.set_target_arr(&targets.proof_data[i], &padded_proof_node)?;
         }
+
+        let empty_hash = vec![F::ZERO; 4];
         for i in 0..MAX_PROOF_LEN {
-            let hash = match self.hashes.get(i) {
-                Some(hash) => hash,
-                None => &vec![F::ZERO; 4],
-            };
+            let hash = self.hashes.get(i).unwrap_or(&empty_hash);
             pw.set_hash_target(targets.hashes[i], HashOut::from_partial(&hash[..4]))?;
         }
 

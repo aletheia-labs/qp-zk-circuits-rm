@@ -18,10 +18,36 @@ pub struct CircuitInputs {
     nullifier: Nullifier,
     unspendable_account: UnspendableAccount,
     storage_proof: StorageProof,
-    // TODO: Clean up input format.
     nullifier_preimage: Vec<u8>,
     unspendable_account_preimage: Vec<u8>,
     root_hash: [u8; 32],
+}
+
+impl CircuitInputs {
+    pub fn new(
+        funding_tx_amount: u64,
+        exit_amount: u64,
+        fee_amount: u64,
+        nullifier_preimage: Vec<u8>,
+        unspendable_account_preimage: Vec<u8>,
+        storage_proof: Vec<(&str, &str)>,
+        root_hash: [u8; 32],
+    ) -> anyhow::Result<Self> {
+        let amounts = Amounts::new(funding_tx_amount, exit_amount, fee_amount);
+        let nullifier = Nullifier::new(&nullifier_preimage)?;
+        let unspendable_account = UnspendableAccount::new(&unspendable_account_preimage)?;
+        let storage_proof = StorageProof::new(storage_proof)?;
+
+        Ok(Self {
+            amounts,
+            nullifier,
+            unspendable_account,
+            storage_proof,
+            nullifier_preimage,
+            unspendable_account_preimage,
+            root_hash,
+        })
+    }
 }
 
 #[derive(Debug)]
