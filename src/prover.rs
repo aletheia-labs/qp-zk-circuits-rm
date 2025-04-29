@@ -12,15 +12,15 @@ use crate::circuit::{
     unspendable_account::{UnspendableAccount, UnspendableAccountInputs},
 };
 
-#[derive(Debug, Default)]
-pub struct CircuitInputs<'a> {
+#[derive(Debug)]
+pub struct CircuitInputs {
     amounts: Amounts,
     nullifier: Nullifier,
     unspendable_account: UnspendableAccount,
     storage_proof: StorageProof,
     // TODO: Clean up input format.
-    nullifier_preimage: &'a str,
-    unspendable_account_preimage: &'a str,
+    nullifier_preimage: Vec<u8>,
+    unspendable_account_preimage: Vec<u8>,
     root_hash: [u8; 32],
 }
 
@@ -62,9 +62,9 @@ impl WormholeProver {
             bail!("prover has already commited to inputs");
         };
 
-        let nullifier_inputs = NullifierInputs::new(circuit_inputs.nullifier_preimage)?;
+        let nullifier_inputs = NullifierInputs::new(&circuit_inputs.nullifier_preimage)?;
         let unspendable_account_inputs =
-            UnspendableAccountInputs::new(circuit_inputs.unspendable_account_preimage)?;
+            UnspendableAccountInputs::new(&circuit_inputs.unspendable_account_preimage)?;
 
         circuit_inputs
             .amounts
@@ -103,13 +103,35 @@ impl WormholeProver {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
+    use crate::circuit::{nullifier, storage_proof::tests::ROOT_HASH, unspendable_account};
+
     use super::{CircuitInputs, WormholeProver};
+
+    impl Default for CircuitInputs {
+        fn default() -> Self {
+            let root_hash: [u8; 32] = hex::decode(ROOT_HASH).unwrap().try_into().unwrap();
+            let nullifier_preimage = hex::decode(nullifier::tests::PREIMAGE).unwrap();
+            let unspendable_account_preimage =
+                hex::decode(unspendable_account::tests::PREIMAGES[0]).unwrap();
+
+            Self {
+                amounts: Default::default(),
+                nullifier: Default::default(),
+                unspendable_account: Default::default(),
+                storage_proof: Default::default(),
+                nullifier_preimage,
+                unspendable_account_preimage,
+                root_hash,
+            }
+        }
+    }
 
     #[test]
     fn commit_and_prove() {
         let prover = WormholeProver::new();
         let inputs = CircuitInputs::default();
+        println!("{:?}", inputs);
         prover.commit(inputs).unwrap().prove().unwrap();
     }
 }

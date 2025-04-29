@@ -9,7 +9,7 @@ use plonky2::{
 
 use super::{CircuitFragment, D, F, gadgets::is_const_less_than, slice_to_field_elements};
 
-pub const MAX_PROOF_LEN: usize = 8;
+pub const MAX_PROOF_LEN: usize = 64;
 pub const PROOF_NODE_MAX_SIZE: usize = 73;
 
 #[derive(Debug, Default)]
@@ -31,7 +31,7 @@ pub struct StorageProofTargets {
     pub hashes: Vec<HashOutTarget>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct StorageProof {
     proof: Vec<Vec<F>>,
     hashes: Vec<Vec<F>>,
@@ -159,7 +159,7 @@ fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use plonky2::plonk::proof::ProofWithPublicInputs;
     use std::panic;
 
@@ -169,6 +169,22 @@ mod tests {
         tests::{build_and_prove_test, setup_test_builder_and_witness},
     };
     use rand::Rng;
+
+    pub const ROOT_HASH: &str = "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
+    pub const STORAGE_PROOF: [(&str, &str); 3] = [
+        (
+            "802cb08072547dce8ca905abf49c9c644951ff048087cc6f4b497fcc6c24e5592da3bc6a80c9f21db91c755ab0e99f00c73c93eb1742e9d8ba3facffa6e5fda8718006e05e80e4faa006b3beae9cb837950c42a2ab760843d05d224dc437b1add4627ddf6b4580",
+            "68ff0ee21014648cb565ea90c578e0d345b51e857ecb71aaa8e307e20655a83680d8496e0fd1b138c06197ed42f322409c66a8abafd87b3256089ea7777495992180966518d63d0d450bdf3a4f16bb755b96e022464082e2cb3cf9072dd9ef7c9b53",
+        ),
+        (
+            "9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080",
+            "91a67194de54f5741ef011a470a09ad4319935c7ddc4ec11f5a9fa75dd173bd8",
+        ),
+        (
+            "80840080",
+            "2febfc925f8398a1cf35c5de15443d3940255e574ce541f7e67a3f86dbc2a98580cbfbed5faf5b9f416c54ee9d0217312d230bcc0cb57c5817dbdd7f7df9006a63",
+        ),
+    ];
 
     fn run_test(
         storage_proof: StorageProof,
@@ -183,21 +199,11 @@ mod tests {
         build_and_prove_test(builder, pw)
     }
 
-    const ROOT_HASH: &str = "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
-    const STORAGE_PROOF: [(&str, &str); 3] = [
-        (
-            "802cb08072547dce8ca905abf49c9c644951ff048087cc6f4b497fcc6c24e5592da3bc6a80c9f21db91c755ab0e99f00c73c93eb1742e9d8ba3facffa6e5fda8718006e05e80e4faa006b3beae9cb837950c42a2ab760843d05d224dc437b1add4627ddf6b4580",
-            "68ff0ee21014648cb565ea90c578e0d345b51e857ecb71aaa8e307e20655a83680d8496e0fd1b138c06197ed42f322409c66a8abafd87b3256089ea7777495992180966518d63d0d450bdf3a4f16bb755b96e022464082e2cb3cf9072dd9ef7c9b53",
-        ),
-        (
-            "9f02261276cc9d1f8598ea4b6a74b15c2f3000505f0e7b9012096b41c4eb3aaf947f6ea42908010080",
-            "91a67194de54f5741ef011a470a09ad4319935c7ddc4ec11f5a9fa75dd173bd8",
-        ),
-        (
-            "80840080",
-            "2febfc925f8398a1cf35c5de15443d3940255e574ce541f7e67a3f86dbc2a98580cbfbed5faf5b9f416c54ee9d0217312d230bcc0cb57c5817dbdd7f7df9006a63",
-        ),
-    ];
+    impl Default for StorageProof {
+        fn default() -> Self {
+            StorageProof::new(STORAGE_PROOF.to_vec()).unwrap()
+        }
+    }
 
     #[test]
     fn build_and_verify_proof() {

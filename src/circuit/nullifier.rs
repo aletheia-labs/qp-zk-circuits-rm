@@ -12,17 +12,14 @@ use super::{CircuitFragment, D, Digest, F, slice_to_field_elements};
 // FIXME: Adjust as needed.
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Nullifier {
     hash: Digest,
 }
 
 impl Nullifier {
-    pub fn new(preimage: &str) -> anyhow::Result<Self> {
-        // Calculate the preimage by concatanating [`SALT`], the intrinsic_tx and the secret value.
-        let decoded = hex::decode(preimage)?;
-        let preimage = slice_to_field_elements(&decoded);
-
+    pub fn new(preimage: &[u8]) -> anyhow::Result<Self> {
+        let preimage = slice_to_field_elements(preimage);
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
         let hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
 
@@ -36,15 +33,14 @@ pub struct NullifierTargets {
     preimage: Vec<Target>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct NullifierInputs {
     preimage: Vec<F>,
 }
 
 impl NullifierInputs {
-    pub fn new(preimage: &str) -> anyhow::Result<Self> {
-        let decoded = hex::decode(preimage)?;
-        let preimage = slice_to_field_elements(&decoded);
+    pub fn new(preimage: &[u8]) -> anyhow::Result<Self> {
+        let preimage = slice_to_field_elements(preimage);
         Ok(Self { preimage })
     }
 }
@@ -84,7 +80,7 @@ impl CircuitFragment for Nullifier {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
     use crate::circuit::{
@@ -105,26 +101,39 @@ mod tests {
         build_and_prove_test(builder, pw)
     }
 
-    const PREIMAGE: &str =
+    pub const PREIMAGE: &str =
         "776f726d686f6c650908804f8983b91253f3b2e4d49b71afc8e2c707608d9ae456990fb21591037f";
+
+    impl Default for Nullifier {
+        fn default() -> Self {
+            let preimage = hex::decode(PREIMAGE).unwrap();
+            Self::new(&preimage).unwrap()
+        }
+    }
+
+    impl Default for NullifierInputs {
+        fn default() -> Self {
+            let preimage = hex::decode(PREIMAGE).unwrap();
+            Self::new(&preimage).unwrap()
+        }
+    }
 
     #[test]
     fn build_and_verify_proof() {
-        let nullifier = Nullifier::new(PREIMAGE).unwrap();
-        let inputs = NullifierInputs::new(PREIMAGE).unwrap();
+        let nullifier = Nullifier::default();
+        let inputs = NullifierInputs::default();
         run_test(nullifier, inputs).unwrap();
     }
 
     #[test]
     fn invalid_preimage_fails_proof() {
-        let valid_nullifier = Nullifier::new(PREIMAGE).unwrap();
+        let valid_nullifier = Nullifier::default();
 
-        // Flip the first byte in the first node hash.
+        // Flip the first byte of the preimage.
         let mut invalid_bytes = hex::decode(PREIMAGE).unwrap();
         invalid_bytes[0] ^= 0xFF;
-        let invalid_hex = hex::encode(invalid_bytes);
 
-        let bad_inputs = NullifierInputs::new(&invalid_hex).unwrap();
+        let bad_inputs = NullifierInputs::new(&invalid_bytes).unwrap();
 
         let res = run_test(valid_nullifier, bad_inputs);
         assert!(res.is_err(),);
@@ -133,9 +142,7 @@ mod tests {
     #[test]
     fn all_zero_preimage_is_valid_and_hashes() {
         let preimage_bytes = vec![0u8; 64];
-        let hex_preimage = hex::encode(preimage_bytes);
-
-        let nullifier = Nullifier::new(&hex_preimage).unwrap();
+        let nullifier = Nullifier::new(&preimage_bytes).unwrap();
         assert!(!nullifier.hash.to_vec().iter().all(|x| x.is_zero()));
     }
 }
