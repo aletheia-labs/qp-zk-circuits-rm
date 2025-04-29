@@ -14,13 +14,13 @@ use crate::circuit::{
 
 #[derive(Debug)]
 pub struct CircuitInputs {
-    amounts: Amounts,
-    nullifier: Nullifier,
-    unspendable_account: UnspendableAccount,
-    storage_proof: StorageProof,
-    nullifier_preimage: Vec<u8>,
-    unspendable_account_preimage: Vec<u8>,
-    root_hash: [u8; 32],
+    pub funding_tx_amount: u64,
+    pub exit_amount: u64,
+    pub fee_amount: u64,
+    pub nullifier_preimage: Vec<u8>,
+    pub unspendable_account_preimage: Vec<u8>,
+    pub storage_proof: Vec<(Vec<u8>, Vec<u8>)>,
+    pub root_hash: [u8; 32],
 }
 
 impl CircuitInputs {
@@ -30,26 +30,22 @@ impl CircuitInputs {
         fee_amount: u64,
         nullifier_preimage: Vec<u8>,
         unspendable_account_preimage: Vec<u8>,
-        storage_proof: Vec<(&str, &str)>,
+        storage_proof: Vec<(Vec<u8>, Vec<u8>)>,
         root_hash: [u8; 32],
-    ) -> anyhow::Result<Self> {
-        let amounts = Amounts::new(funding_tx_amount, exit_amount, fee_amount);
-        let nullifier = Nullifier::new(&nullifier_preimage)?;
-        let unspendable_account = UnspendableAccount::new(&unspendable_account_preimage)?;
-        let storage_proof = StorageProof::new(storage_proof)?;
-
-        Ok(Self {
-            amounts,
-            nullifier,
-            unspendable_account,
-            storage_proof,
+    ) -> Self {
+        Self {
+            funding_tx_amount,
+            exit_amount,
+            fee_amount,
             nullifier_preimage,
             unspendable_account_preimage,
+            storage_proof,
             root_hash,
-        })
+        }
     }
 }
 
+/// A prover for the wormhole circuit.
 #[derive(Debug)]
 pub struct WormholeProver {
     circuit_data: ProverCircuitData<F, C, D>,
@@ -88,24 +84,27 @@ impl WormholeProver {
             bail!("prover has already commited to inputs");
         };
 
+        let amounts = Amounts::from(&circuit_inputs);
+        let nullifier = Nullifier::from(&circuit_inputs);
+        let unspendable_account = UnspendableAccount::from(&circuit_inputs);
+        let storage_proof = StorageProof::from(&circuit_inputs);
+
         let nullifier_inputs = NullifierInputs::new(&circuit_inputs.nullifier_preimage)?;
         let unspendable_account_inputs =
             UnspendableAccountInputs::new(&circuit_inputs.unspendable_account_preimage)?;
 
-        circuit_inputs
-            .amounts
-            .fill_targets(&mut self.partial_witness, targets.amounts, ())?;
-        circuit_inputs.nullifier.fill_targets(
+        amounts.fill_targets(&mut self.partial_witness, targets.amounts, ())?;
+        nullifier.fill_targets(
             &mut self.partial_witness,
             targets.nullifier,
             nullifier_inputs,
         )?;
-        circuit_inputs.unspendable_account.fill_targets(
+        unspendable_account.fill_targets(
             &mut self.partial_witness,
             targets.unspendable_account,
             unspendable_account_inputs,
         )?;
-        circuit_inputs.storage_proof.fill_targets(
+        storage_proof.fill_targets(
             &mut self.partial_witness,
             targets.storage_proof,
             StorageProofInputs::new(circuit_inputs.root_hash),
@@ -131,24 +130,27 @@ impl WormholeProver {
 #[cfg(any(test, feature = "bench"))]
 pub mod test_helpers {
 
-    use crate::circuit::{nullifier, storage_proof::test_helpers::ROOT_HASH, unspendable_account};
+    use crate::circuit::{
+        nullifier,
+        storage_proof::test_helpers::{ROOT_HASH, default_proof},
+        unspendable_account,
+    };
 
     use super::CircuitInputs;
 
     impl Default for CircuitInputs {
         fn default() -> Self {
-            let root_hash: [u8; 32] = hex::decode(ROOT_HASH).unwrap().try_into().unwrap();
             let nullifier_preimage = hex::decode(nullifier::test_helpers::PREIMAGE).unwrap();
             let unspendable_account_preimage =
                 hex::decode(unspendable_account::test_helpers::PREIMAGES[0]).unwrap();
-
+            let root_hash: [u8; 32] = hex::decode(ROOT_HASH).unwrap().try_into().unwrap();
             Self {
-                amounts: Default::default(),
-                nullifier: Default::default(),
-                unspendable_account: Default::default(),
-                storage_proof: Default::default(),
+                funding_tx_amount: 0,
+                exit_amount: 0,
+                fee_amount: 0,
                 nullifier_preimage,
                 unspendable_account_preimage,
+                storage_proof: default_proof(),
                 root_hash,
             }
         }

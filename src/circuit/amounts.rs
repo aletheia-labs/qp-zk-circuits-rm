@@ -7,6 +7,8 @@ use plonky2::{
     plonk::circuit_builder::CircuitBuilder,
 };
 
+use crate::prover::CircuitInputs;
+
 use super::{CircuitFragment, D, F};
 
 #[derive(Debug, Default)]
@@ -26,6 +28,12 @@ impl Amounts {
             exit_amount: F::from_noncanonical_u64(exit_amount),
             fee_amount: F::from_noncanonical_u64(fee_amount),
         }
+    }
+}
+
+impl From<&CircuitInputs> for Amounts {
+    fn from(value: &CircuitInputs) -> Self {
+        Self::new(value.funding_tx_amount, value.exit_amount, value.fee_amount)
     }
 }
 

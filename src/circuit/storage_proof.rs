@@ -7,10 +7,13 @@ use plonky2::{
     iop::{target::Target, witness::WitnessWrite},
 };
 
+use crate::prover::CircuitInputs;
+
 use super::{CircuitFragment, D, F, gadgets::is_const_less_than, slice_to_field_elements};
 
 pub const MAX_PROOF_LEN: usize = 64;
-pub const PROOF_NODE_MAX_SIZE: usize = 73;
+pub const PROOF_NODE_MAX_SIZE_F: usize = 73;
+pub const PROOF_NODE_MAX_SIZE_B: usize = 256;
 
 #[derive(Debug, Default)]
 pub struct StorageProofInputs {
@@ -40,29 +43,33 @@ pub struct StorageProof {
 impl StorageProof {
     /// The input is a storage proof as a tuple where each part is split at the index where the child node's
     /// hash, if any, appears within this proof node
-    pub fn new(proof: Vec<(&str, &str)>) -> anyhow::Result<Self> {
+    pub fn new(proof: &[(Vec<u8>, Vec<u8>)]) -> Self {
         // First construct the proof and the hash array
         let mut constructed_proof = Vec::with_capacity(proof.len());
         let mut hashes = Vec::with_capacity(proof.len());
-        for (left, right) in proof.into_iter() {
-            // Decode hex data.
-            let mut proof_node_bytes = hex::decode(left)?;
-            let right = hex::decode(right)?;
-
-            proof_node_bytes.extend(right.clone());
+        for (left, right) in proof.iter() {
+            let mut proof_node = Vec::with_capacity(PROOF_NODE_MAX_SIZE_B);
+            proof_node.extend_from_slice(left);
+            proof_node.extend_from_slice(right);
 
             // We make sure to convert to field elements after an eventual hash has been appended.
-            let proof_node = slice_to_field_elements(&proof_node_bytes);
-            let hash = slice_to_field_elements(&right)[..4].to_vec();
+            let proof_node_f = slice_to_field_elements(&proof_node);
+            let hash = slice_to_field_elements(right)[..4].to_vec();
 
-            constructed_proof.push(proof_node);
+            constructed_proof.push(proof_node_f);
             hashes.push(hash);
         }
 
-        Ok(StorageProof {
+        StorageProof {
             proof: constructed_proof,
             hashes,
-        })
+        }
+    }
+}
+
+impl From<&CircuitInputs> for StorageProof {
+    fn from(value: &CircuitInputs) -> Self {
+        Self::new(&value.storage_proof)
     }
 }
 
@@ -80,7 +87,7 @@ impl CircuitFragment for StorageProof {
         let root_hash = builder.add_virtual_hash_public_input();
         let mut proof_data = Vec::with_capacity(MAX_PROOF_LEN);
         for _ in 0..MAX_PROOF_LEN {
-            let proof_node = builder.add_virtual_targets(PROOF_NODE_MAX_SIZE);
+            let proof_node = builder.add_virtual_targets(PROOF_NODE_MAX_SIZE_F);
             proof_data.push(proof_node);
         }
 
@@ -125,7 +132,7 @@ impl CircuitFragment for StorageProof {
         targets: Self::Targets,
         inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        const EMPTY_PROOF_NODE: [F; PROOF_NODE_MAX_SIZE] = [F::ZERO; PROOF_NODE_MAX_SIZE];
+        const EMPTY_PROOF_NODE: [F; PROOF_NODE_MAX_SIZE_F] = [F::ZERO; PROOF_NODE_MAX_SIZE_F];
 
         pw.set_hash_target(targets.root_hash, slice_to_hashout(&inputs.root_hash))?;
         pw.set_target(targets.proof_len, F::from_canonical_usize(self.proof.len()))?;
@@ -134,7 +141,7 @@ impl CircuitFragment for StorageProof {
             match self.proof.get(i) {
                 Some(node) => {
                     let mut padded_proof_node = node.clone();
-                    padded_proof_node.resize(PROOF_NODE_MAX_SIZE, F::ZERO);
+                    padded_proof_node.resize(PROOF_NODE_MAX_SIZE_F, F::ZERO);
                     pw.set_target_arr(&targets.proof_data[i], &padded_proof_node)?;
                 }
                 None => pw.set_target_arr(&targets.proof_data[i], &EMPTY_PROOF_NODE)?,
@@ -180,8 +187,18 @@ pub mod test_helpers {
 
     impl Default for StorageProof {
         fn default() -> Self {
-            StorageProof::new(STORAGE_PROOF.to_vec()).unwrap()
+            StorageProof::new(&default_proof())
         }
+    }
+
+    pub fn default_proof() -> Vec<(Vec<u8>, Vec<u8>)> {
+        STORAGE_PROOF
+            .map(|(l, r)| {
+                let left = hex::decode(l).unwrap();
+                let right = hex::decode(r).unwrap();
+                (left, right)
+            })
+            .to_vec()
     }
 }
 
@@ -191,7 +208,7 @@ pub mod tests {
     use std::panic;
 
     use super::{
-        test_helpers::{ROOT_HASH, STORAGE_PROOF},
+        test_helpers::{ROOT_HASH, default_proof},
         *,
     };
     use crate::circuit::{
@@ -215,7 +232,7 @@ pub mod tests {
 
     #[test]
     fn build_and_verify_proof() {
-        let storage_proof = StorageProof::new(STORAGE_PROOF.to_vec()).unwrap();
+        let storage_proof = StorageProof::default();
         let inputs = StorageProofInputs {
             root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
         };
@@ -226,7 +243,7 @@ pub mod tests {
     #[test]
     #[should_panic]
     fn invalid_root_hash_fails() {
-        let proof = StorageProof::new(STORAGE_PROOF.to_vec()).unwrap();
+        let proof = StorageProof::default();
         let inputs = StorageProofInputs {
             root_hash: [0u8; 32],
         };
@@ -237,15 +254,12 @@ pub mod tests {
     #[test]
     #[should_panic]
     fn tampered_proof_fails() {
-        let mut tampered_proof = STORAGE_PROOF.to_vec();
+        let mut tampered_proof = default_proof();
 
         // Flip the first byte in the first node hash.
-        let mut right_bytes = hex::decode(tampered_proof[0].1).unwrap();
-        right_bytes[0] ^= 0xFF;
-        let right_bytes_hex = hex::encode(&right_bytes);
-        tampered_proof[0].1 = &right_bytes_hex;
+        tampered_proof[0].1[0] ^= 0xFF;
 
-        let proof = StorageProof::new(tampered_proof).unwrap();
+        let proof = StorageProof::new(&tampered_proof);
         let inputs = StorageProofInputs {
             root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
         };
@@ -264,26 +278,19 @@ pub mod tests {
 
         for i in 0..FUZZ_ITERATIONS {
             // Clone the original storage proof
-            let mut tampered_proof = STORAGE_PROOF.to_vec();
+            let mut tampered_proof = default_proof();
 
             // Randomly select a node in the proof to tamper
             let node_index = rng.random_range(0..tampered_proof.len());
 
-            // Decode the hex string of the selected node
-            let mut bytes = hex::decode(tampered_proof[node_index].1).unwrap();
-
             // Randomly select a byte to flip
-            let byte_index = rng.random_range(0..bytes.len());
+            let byte_index = rng.random_range(0..tampered_proof[0].1.len());
 
             // Flip random bits in the selected byte (e.g., XOR with a random value)
-            bytes[byte_index] ^= rng.random_range(1..=255);
-
-            // Encode the tampered bytes back to hex
-            let tampered_hex = hex::encode(&bytes);
-            tampered_proof[node_index].1 = &tampered_hex;
+            tampered_proof[node_index].1[byte_index] ^= rng.random_range(1..=255);
 
             // Create the proof and inputs
-            let proof = StorageProof::new(tampered_proof).unwrap();
+            let proof = StorageProof::new(&tampered_proof);
             let inputs = StorageProofInputs {
                 root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
             };

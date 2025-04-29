@@ -7,6 +7,8 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
+use crate::prover::CircuitInputs;
+
 use super::{CircuitFragment, D, Digest, F, slice_to_field_elements};
 
 // FIXME: Adjust as needed.
@@ -18,12 +20,18 @@ pub struct Nullifier {
 }
 
 impl Nullifier {
-    pub fn new(preimage: &[u8]) -> anyhow::Result<Self> {
+    pub fn new(preimage: &[u8]) -> Self {
         let preimage = slice_to_field_elements(preimage);
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
         let hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
 
-        Ok(Self { hash })
+        Self { hash }
+    }
+}
+
+impl From<&CircuitInputs> for Nullifier {
+    fn from(value: &CircuitInputs) -> Self {
+        Self::new(&value.nullifier_preimage)
     }
 }
 
@@ -89,7 +97,7 @@ pub mod test_helpers {
     impl Default for Nullifier {
         fn default() -> Self {
             let preimage = hex::decode(PREIMAGE).unwrap();
-            Self::new(&preimage).unwrap()
+            Self::new(&preimage)
         }
     }
 
@@ -148,7 +156,7 @@ pub mod tests {
     #[test]
     fn all_zero_preimage_is_valid_and_hashes() {
         let preimage_bytes = vec![0u8; 64];
-        let nullifier = Nullifier::new(&preimage_bytes).unwrap();
+        let nullifier = Nullifier::new(&preimage_bytes);
         assert!(!nullifier.hash.to_vec().iter().all(|x| x.is_zero()));
     }
 }
