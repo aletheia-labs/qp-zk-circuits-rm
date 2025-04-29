@@ -158,17 +158,9 @@ fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
-    use plonky2::plonk::proof::ProofWithPublicInputs;
-    use std::panic;
-
-    use super::*;
-    use crate::circuit::{
-        C,
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
-    };
-    use rand::Rng;
+#[cfg(any(test, feature = "bench"))]
+pub mod test_helpers {
+    use super::StorageProof;
 
     pub const ROOT_HASH: &str = "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
     pub const STORAGE_PROOF: [(&str, &str); 3] = [
@@ -186,6 +178,28 @@ pub mod tests {
         ),
     ];
 
+    impl Default for StorageProof {
+        fn default() -> Self {
+            StorageProof::new(STORAGE_PROOF.to_vec()).unwrap()
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use plonky2::plonk::proof::ProofWithPublicInputs;
+    use std::panic;
+
+    use super::{
+        test_helpers::{ROOT_HASH, STORAGE_PROOF},
+        *,
+    };
+    use crate::circuit::{
+        C,
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
+    };
+    use rand::Rng;
+
     fn run_test(
         storage_proof: StorageProof,
         inputs: StorageProofInputs,
@@ -197,12 +211,6 @@ pub mod tests {
             .fill_targets(&mut pw, targets, inputs)
             .unwrap();
         build_and_prove_test(builder, pw)
-    }
-
-    impl Default for StorageProof {
-        fn default() -> Self {
-            StorageProof::new(STORAGE_PROOF.to_vec()).unwrap()
-        }
     }
 
     #[test]

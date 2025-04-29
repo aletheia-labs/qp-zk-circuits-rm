@@ -102,18 +102,19 @@ impl WormholeProver {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
-    use crate::circuit::{nullifier, storage_proof::tests::ROOT_HASH, unspendable_account};
+#[cfg(any(test, feature = "bench"))]
+pub mod test_helpers {
 
-    use super::{CircuitInputs, WormholeProver};
+    use crate::circuit::{nullifier, storage_proof::test_helpers::ROOT_HASH, unspendable_account};
+
+    use super::CircuitInputs;
 
     impl Default for CircuitInputs {
         fn default() -> Self {
             let root_hash: [u8; 32] = hex::decode(ROOT_HASH).unwrap().try_into().unwrap();
-            let nullifier_preimage = hex::decode(nullifier::tests::PREIMAGE).unwrap();
+            let nullifier_preimage = hex::decode(nullifier::test_helpers::PREIMAGE).unwrap();
             let unspendable_account_preimage =
-                hex::decode(unspendable_account::tests::PREIMAGES[0]).unwrap();
+                hex::decode(unspendable_account::test_helpers::PREIMAGES[0]).unwrap();
 
             Self {
                 amounts: Default::default(),
@@ -126,12 +127,16 @@ pub mod tests {
             }
         }
     }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::{CircuitInputs, WormholeProver};
 
     #[test]
     fn commit_and_prove() {
         let prover = WormholeProver::new();
         let inputs = CircuitInputs::default();
-        println!("{:?}", inputs);
         prover.commit(inputs).unwrap().prove().unwrap();
     }
 }

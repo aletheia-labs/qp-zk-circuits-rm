@@ -79,27 +79,9 @@ impl CircuitFragment for Nullifier {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
-    use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
-
-    use crate::circuit::{
-        C,
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
-    };
-
-    use super::*;
-
-    fn run_test(
-        nullifier: Nullifier,
-        inputs: NullifierInputs,
-    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
-        let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = Nullifier::circuit(&mut builder);
-
-        nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
-        build_and_prove_test(builder, pw)
-    }
+#[cfg(any(test, feature = "bench"))]
+pub mod test_helpers {
+    use super::{Nullifier, NullifierInputs};
 
     pub const PREIMAGE: &str =
         "776f726d686f6c650908804f8983b91253f3b2e4d49b71afc8e2c707608d9ae456990fb21591037f";
@@ -116,6 +98,30 @@ pub mod tests {
             let preimage = hex::decode(PREIMAGE).unwrap();
             Self::new(&preimage).unwrap()
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
+
+    use crate::circuit::{
+        C,
+        nullifier::test_helpers::PREIMAGE,
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
+    };
+
+    use super::*;
+
+    fn run_test(
+        nullifier: Nullifier,
+        inputs: NullifierInputs,
+    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let targets = Nullifier::circuit(&mut builder);
+
+        nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
+        build_and_prove_test(builder, pw)
     }
 
     #[test]

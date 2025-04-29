@@ -89,29 +89,9 @@ impl CircuitFragment for UnspendableAccount {
     }
 }
 
-#[cfg(test)]
-pub mod tests {
-    use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
-
-    use crate::circuit::{
-        C,
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
-    };
-
-    use super::*;
-
-    fn run_test(
-        unspendable_account: UnspendableAccount,
-        inputs: UnspendableAccountInputs,
-    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
-        let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = UnspendableAccount::circuit(&mut builder);
-
-        unspendable_account
-            .fill_targets(&mut pw, targets, inputs)
-            .unwrap();
-        build_and_prove_test(builder, pw)
-    }
+#[cfg(any(test, feature = "bench"))]
+pub mod test_helpers {
+    use super::{UnspendableAccount, UnspendableAccountInputs};
 
     /// An array of preimages generated from the Resoncance Node with `./resonance-node key resonance --scheme wormhole`.
     pub const PREIMAGES: [&str; 5] = [
@@ -123,7 +103,7 @@ pub mod tests {
     ];
 
     /// An array of addresses generated from the Resoncance Node with `./resonance-node key resonance --scheme wormhole`.
-    const ADRESSES: [&str; 5] = [
+    pub const ADRESSES: [&str; 5] = [
         "7b434935e653afd2b20726488d155cd183114a3cc70fed3c120ef885a0e2145c",
         "c5ed765c4039d6e48fcf26c79165ee1d14d7bfcfa6e4ce6ac4352ab62e6f9cd5",
         "1e233db6f8797d35b34fcf5c419f77720a859492131803345f60f94ac3cd0964",
@@ -143,6 +123,34 @@ pub mod tests {
             let preimage = hex::decode(PREIMAGES[0]).unwrap();
             Self::new(&preimage).unwrap()
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
+
+    use crate::circuit::{
+        C,
+        tests::{build_and_prove_test, setup_test_builder_and_witness},
+    };
+
+    use super::{
+        test_helpers::{ADRESSES, PREIMAGES},
+        *,
+    };
+
+    fn run_test(
+        unspendable_account: UnspendableAccount,
+        inputs: UnspendableAccountInputs,
+    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let targets = UnspendableAccount::circuit(&mut builder);
+
+        unspendable_account
+            .fill_targets(&mut pw, targets, inputs)
+            .unwrap();
+        build_and_prove_test(builder, pw)
     }
 
     #[test]
