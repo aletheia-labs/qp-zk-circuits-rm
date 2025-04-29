@@ -1,17 +1,13 @@
 use plonky2::{
-    field::{extension::Extendable, types::Field},
+    field::types::Field,
     hash::{
-        hash_types::{HashOut, HashOutTarget, RichField},
+        hash_types::{HashOut, HashOutTarget},
         poseidon::PoseidonHash,
     },
-    iop::{
-        target::{BoolTarget, Target},
-        witness::WitnessWrite,
-    },
-    plonk::circuit_builder::CircuitBuilder,
+    iop::{target::Target, witness::WitnessWrite},
 };
 
-use super::{CircuitFragment, D, F, slice_to_field_elements};
+use super::{CircuitFragment, D, F, gadgets::is_const_less_than, slice_to_field_elements};
 
 pub const MAX_PROOF_LEN: usize = 8;
 pub const PROOF_NODE_MAX_SIZE: usize = 73;
@@ -153,60 +149,6 @@ impl CircuitFragment for StorageProof {
 
         Ok(())
     }
-}
-
-pub fn select_hash<F: RichField + Extendable<D>, const D: usize>(
-    builder: &mut CircuitBuilder<F, D>,
-    selector: BoolTarget,
-    a: HashOutTarget,
-    b: HashOutTarget,
-) -> HashOutTarget {
-    let elements = std::array::from_fn(|i| builder.select(selector, a.elements[i], b.elements[i]));
-    HashOutTarget { elements }
-}
-
-// TODO: Double check logic and move to gadgets mod.
-fn is_const_less_than<F: RichField + Extendable<D>, const D: usize>(
-    builder: &mut CircuitBuilder<F, D>,
-    i: usize,
-    proof_len: Target,
-    n_log: usize,
-) -> BoolTarget {
-    let proof_len_bits = builder.split_le(proof_len, n_log);
-    let i_bits: Vec<bool> = (0..n_log).map(|j| ((i >> j) & 1) != 0).collect();
-
-    let mut lt = builder._false();
-    let mut eq = builder._true();
-
-    for j in (0..n_log).rev() {
-        let a = builder.constant_bool(i_bits[j]);
-        let b = proof_len_bits[j];
-
-        let not_a = builder.not(a);
-        let not_a_and_b = builder.and(not_a, b);
-        let this_lt = builder.and(not_a_and_b, eq);
-        lt = builder.or(lt, this_lt);
-
-        let a_xor_b = xor(builder, a, b);
-        let not_xor = builder.not(a_xor_b);
-        eq = builder.and(eq, not_xor);
-    }
-
-    lt
-}
-
-fn xor<F: RichField + Extendable<D>, const D: usize>(
-    builder: &mut CircuitBuilder<F, D>,
-    a: BoolTarget,
-    b: BoolTarget,
-) -> BoolTarget {
-    let a_t = a.target;
-    let b_t = b.target;
-    let ab = builder.mul(a_t, b_t);
-    let two_ab = builder.mul_const(F::from_canonical_u32(2), ab);
-    let a_plus_b = builder.add(a_t, b_t);
-    let xor = builder.sub(a_plus_b, two_ab);
-    BoolTarget::new_unsafe(xor)
 }
 
 fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {

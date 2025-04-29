@@ -13,6 +13,7 @@ use storage_proof::{StorageProof, StorageProofTargets};
 use unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
 
 pub mod amounts;
+mod gadgets;
 pub mod nullifier;
 pub mod storage_proof;
 pub mod unspendable_account;
