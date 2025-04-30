@@ -2,6 +2,7 @@
 //!
 //! This module defines the zero-knowledge circuit for the Wormhole protocol.
 use amounts::{Amounts, AmountsTargets};
+use exit_account::{ExitAccount, ExitAccountTargets};
 use nullifier::{Nullifier, NullifierTargets};
 use plonky2::{
     field::{goldilocks_field::GoldilocksField, types::Field},
@@ -16,6 +17,7 @@ use storage_proof::{StorageProof, StorageProofTargets};
 use unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
 
 pub mod amounts;
+pub mod exit_account;
 mod gadgets;
 pub mod nullifier;
 pub mod storage_proof;
@@ -66,22 +68,7 @@ pub struct CircuitTargets {
     pub nullifier: NullifierTargets,
     pub unspendable_account: UnspendableAccountTargets,
     pub storage_proof: StorageProofTargets,
-}
-
-impl CircuitTargets {
-    fn new(
-        amounts: AmountsTargets,
-        nullifier: NullifierTargets,
-        unspendable_account: UnspendableAccountTargets,
-        storage_proof: StorageProofTargets,
-    ) -> Self {
-        Self {
-            amounts,
-            nullifier,
-            unspendable_account,
-            storage_proof,
-        }
-    }
+    pub exit_account: ExitAccountTargets,
 }
 
 pub struct WormholeCircuit {
@@ -97,10 +84,17 @@ impl Default for WormholeCircuit {
         // Setup circuits and their targets.
         let amounts = Amounts::circuit(&mut builder);
         let nullifier = Nullifier::circuit(&mut builder);
-        // TODO: Add a dummy check for exit address.
         let unspendable_account = UnspendableAccount::circuit(&mut builder);
         let storage_proof = StorageProof::circuit(&mut builder);
-        let targets = CircuitTargets::new(amounts, nullifier, unspendable_account, storage_proof);
+        let exit_account = ExitAccount::circuit(&mut builder);
+
+        let targets = CircuitTargets {
+            amounts,
+            nullifier,
+            unspendable_account,
+            storage_proof,
+            exit_account,
+        };
 
         Self { builder, targets }
     }

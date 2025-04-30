@@ -30,6 +30,7 @@ use plonky2::{
 use crate::circuit::{
     C, CircuitFragment, CircuitTargets, D, F, WormholeCircuit,
     amounts::Amounts,
+    exit_account::ExitAccount,
     nullifier::{Nullifier, NullifierInputs},
     storage_proof::{StorageProof, StorageProofInputs},
     unspendable_account::{UnspendableAccount, UnspendableAccountInputs},
@@ -55,6 +56,8 @@ pub struct CircuitInputs {
     pub storage_proof: Vec<(Vec<u8>, Vec<u8>)>,
     /// The root hash of the storage trie.
     pub root_hash: [u8; 32],
+    /// The address of the account to pay out to.
+    pub exit_account: [u8; 32],
 }
 
 /// A prover for the wormhole circuit.
@@ -116,6 +119,7 @@ impl WormholeProver {
         let nullifier = Nullifier::from(circuit_inputs);
         let unspendable_account = UnspendableAccount::from(circuit_inputs);
         let storage_proof = StorageProof::from(circuit_inputs);
+        let exit_account = ExitAccount::from(circuit_inputs);
 
         let nullifier_inputs = NullifierInputs::new(&circuit_inputs.nullifier_preimage);
         let unspendable_account_inputs =
@@ -137,6 +141,7 @@ impl WormholeProver {
             targets.storage_proof,
             StorageProofInputs::new(circuit_inputs.root_hash),
         )?;
+        exit_account.fill_targets(&mut self.partial_witness, targets.exit_account, ())?;
 
         Ok(self)
     }
@@ -179,6 +184,7 @@ mod test_helpers {
                 unspendable_account_preimage,
                 storage_proof: default_proof(),
                 root_hash,
+                exit_account: [0u8; 32],
             }
         }
     }
