@@ -47,9 +47,9 @@ pub struct NullifierInputs {
 }
 
 impl NullifierInputs {
-    pub fn new(preimage: &[u8]) -> anyhow::Result<Self> {
+    pub fn new(preimage: &[u8]) -> Self {
         let preimage = slice_to_field_elements(preimage);
-        Ok(Self { preimage })
+        Self { preimage }
     }
 }
 
@@ -104,7 +104,7 @@ pub mod test_helpers {
     impl Default for NullifierInputs {
         fn default() -> Self {
             let preimage = hex::decode(PREIMAGE).unwrap();
-            Self::new(&preimage).unwrap()
+            Self::new(&preimage)
         }
     }
 }
@@ -122,7 +122,7 @@ pub mod tests {
     use super::*;
 
     fn run_test(
-        nullifier: Nullifier,
+        nullifier: &Nullifier,
         inputs: NullifierInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
@@ -136,7 +136,7 @@ pub mod tests {
     fn build_and_verify_proof() {
         let nullifier = Nullifier::default();
         let inputs = NullifierInputs::default();
-        run_test(nullifier, inputs).unwrap();
+        run_test(&nullifier, inputs).unwrap();
     }
 
     #[test]
@@ -147,9 +147,9 @@ pub mod tests {
         let mut invalid_bytes = hex::decode(PREIMAGE).unwrap();
         invalid_bytes[0] ^= 0xFF;
 
-        let bad_inputs = NullifierInputs::new(&invalid_bytes).unwrap();
+        let bad_inputs = NullifierInputs::new(&invalid_bytes);
 
-        let res = run_test(valid_nullifier, bad_inputs);
+        let res = run_test(&valid_nullifier, bad_inputs);
         assert!(res.is_err(),);
     }
 
@@ -157,6 +157,6 @@ pub mod tests {
     fn all_zero_preimage_is_valid_and_hashes() {
         let preimage_bytes = vec![0u8; 64];
         let nullifier = Nullifier::new(&preimage_bytes);
-        assert!(!nullifier.hash.to_vec().iter().all(|x| x.is_zero()));
+        assert!(!nullifier.hash.to_vec().iter().all(Field::is_zero));
     }
 }

@@ -15,7 +15,7 @@ use crate::circuit::{C, D, F, WormholeCircuit};
 /// # fn main() -> anyhow::Result<()> {
 /// # let inputs = CircuitInputs::default();
 /// # let prover = WormholeProver::new();
-/// # let proof = prover.commit(inputs)?.prove()?;
+/// # let proof = prover.commit(&inputs)?.prove()?;
 ///
 /// let verifier = WormholeVerifier::new();
 /// verifier.verify(proof)?;
@@ -60,9 +60,9 @@ mod tests {
     fn verify_simple_proof() {
         let prover = WormholeProver::new();
         let inputs = CircuitInputs::default();
-        let proof = prover.commit(inputs).unwrap().prove().unwrap();
+        let proof = prover.commit(&inputs).unwrap().prove().unwrap();
 
         let verifier = WormholeVerifier::new();
-        verifier.verify(proof).unwrap()
+        verifier.verify(proof).unwrap();
     }
 }

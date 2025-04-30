@@ -36,7 +36,7 @@ pub struct CircuitInputs {
 /// # fn main() -> anyhow::Result<()> {
 /// # let inputs = CircuitInputs::default();
 /// let prover = WormholeProver::new();
-/// let proof = prover.commit(inputs)?.prove()?;
+/// let proof = prover.commit(&inputs)?.prove()?;
 /// # Ok(())
 /// # }
 /// ```
@@ -57,8 +57,8 @@ impl Default for WormholeProver {
 
         Self {
             circuit_data,
-            targets,
             partial_witness,
+            targets,
         }
     }
 }
@@ -73,19 +73,19 @@ impl WormholeProver {
     /// # Errors
     ///
     /// Returns an error if the prover has already commited to inputs previously.
-    pub fn commit(mut self, circuit_inputs: CircuitInputs) -> anyhow::Result<Self> {
+    pub fn commit(mut self, circuit_inputs: &CircuitInputs) -> anyhow::Result<Self> {
         let Some(targets) = self.targets.take() else {
             bail!("prover has already commited to inputs");
         };
 
-        let amounts = Amounts::from(&circuit_inputs);
-        let nullifier = Nullifier::from(&circuit_inputs);
-        let unspendable_account = UnspendableAccount::from(&circuit_inputs);
-        let storage_proof = StorageProof::from(&circuit_inputs);
+        let amounts = Amounts::from(circuit_inputs);
+        let nullifier = Nullifier::from(circuit_inputs);
+        let unspendable_account = UnspendableAccount::from(circuit_inputs);
+        let storage_proof = StorageProof::from(circuit_inputs);
 
-        let nullifier_inputs = NullifierInputs::new(&circuit_inputs.nullifier_preimage)?;
+        let nullifier_inputs = NullifierInputs::new(&circuit_inputs.nullifier_preimage);
         let unspendable_account_inputs =
-            UnspendableAccountInputs::new(&circuit_inputs.unspendable_account_preimage)?;
+            UnspendableAccountInputs::new(&circuit_inputs.unspendable_account_preimage);
 
         amounts.fill_targets(&mut self.partial_witness, targets.amounts, ())?;
         nullifier.fill_targets(
@@ -159,6 +159,6 @@ pub mod tests {
     fn commit_and_prove() {
         let prover = WormholeProver::new();
         let inputs = CircuitInputs::default();
-        prover.commit(inputs).unwrap().prove().unwrap();
+        prover.commit(&inputs).unwrap().prove().unwrap();
     }
 }

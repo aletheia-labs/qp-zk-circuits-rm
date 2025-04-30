@@ -15,7 +15,7 @@ use super::{CircuitFragment, D, F};
 pub struct Amounts {
     /// The amount that a wormhole deposit adress was funded with
     pub funding_tx_amount: F,
-    /// Amount to be given to exit_account
+    /// Amount to be given to exit account
     pub exit_amount: F,
     /// Amount to be given to miner
     pub fee_amount: F,
@@ -90,7 +90,7 @@ mod tests {
     use super::*;
     use plonky2::plonk::proof::ProofWithPublicInputs;
 
-    fn run_test(amounts: Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+    fn run_test(amounts: &Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = Amounts::circuit(&mut builder);
 
@@ -101,51 +101,51 @@ mod tests {
     #[test]
     fn test_valid_amounts() {
         let amounts = Amounts::new(100, 60, 40);
-        run_test(amounts).unwrap();
+        run_test(&amounts).unwrap();
     }
 
     #[test]
     fn test_invalid_amounts_wrong_sum() {
         let amounts = Amounts::new(100, 50, 30);
-        let result = run_test(amounts);
+        let result = run_test(&amounts);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_zero_amounts() {
         let amounts = Amounts::new(0, 0, 0);
-        run_test(amounts).unwrap();
+        run_test(&amounts).unwrap();
     }
 
     #[test]
     fn test_exit_only_no_fee() {
         let amounts = Amounts::new(100, 100, 0);
-        run_test(amounts).unwrap();
+        run_test(&amounts).unwrap();
     }
 
     #[test]
     fn test_fee_only_no_exit() {
         let amounts = Amounts::new(100, 0, 100);
-        run_test(amounts).unwrap();
+        run_test(&amounts).unwrap();
     }
 
     #[test]
     fn test_max_amounts() {
         let amounts = Amounts::new(u64::MAX, u64::MAX - 1, 1);
-        run_test(amounts).unwrap();
+        run_test(&amounts).unwrap();
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "set twice with different values")]
     fn test_underflow() {
         let amounts = Amounts::new(0, u64::MAX, 1);
-        run_test(amounts).unwrap();
+        run_test(&amounts).unwrap();
     }
 
     #[test]
     fn test_invalid_large_fee() {
         let amounts = Amounts::new(100, 10, 100);
-        let result = run_test(amounts);
+        let result = run_test(&amounts);
         assert!(result.is_err());
     }
 }

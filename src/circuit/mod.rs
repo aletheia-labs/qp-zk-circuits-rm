@@ -24,14 +24,14 @@ pub type Digest = [F; 4];
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
 
-pub const SECRET_NUM_BYTES: usize = 32;
-
 pub trait CircuitFragment {
     type PrivateInputs;
     type Targets;
 
+    /// Builds a circuit and returns the targets used for filling in the witness values.
     fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets;
 
+    /// Fills the targets in the partial witness with the provided inputs.
     fn fill_targets(
         &self,
         pw: &mut PartialWitness<F>,
@@ -48,7 +48,7 @@ pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
     for chunk in input.chunks(BYTES_PER_ELEMENT) {
         let mut bytes = [0u8; 8];
         bytes[..chunk.len()].copy_from_slice(chunk);
-        // Convert the chunk to a field element
+        // Convert the chunk to a field element.
         let value = u64::from_le_bytes(bytes);
         let field_element = F::from_noncanonical_u64(value);
         field_elements.push(field_element);

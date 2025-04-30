@@ -9,21 +9,21 @@ use wormhole_circuit::{
 
 const MEASUREMENT_TIME_S: u64 = 20;
 
-pub fn create_proof(c: &mut Criterion) {
+fn create_proof(c: &mut Criterion) {
     c.bench_function("prover", |b| {
         b.iter(|| {
             let prover = WormholeProver::new();
             let inputs = CircuitInputs::default();
-            prover.commit(inputs).unwrap().prove().unwrap();
-        })
+            prover.commit(&inputs).unwrap().prove().unwrap();
+        });
     });
 }
 
-pub fn verify_proof(c: &mut Criterion) {
+fn verify_proof(c: &mut Criterion) {
     c.bench_function("verifier", |b| {
         let inputs = CircuitInputs::default();
         let proof = WormholeProver::default()
-            .commit(inputs)
+            .commit(&inputs)
             .unwrap()
             .prove()
             .unwrap();
@@ -31,7 +31,7 @@ pub fn verify_proof(c: &mut Criterion) {
         b.iter(|| {
             let verifier = WormholeVerifier::new();
             verifier.verify(proof.clone()).unwrap();
-        })
+        });
     });
 }
 

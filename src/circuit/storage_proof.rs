@@ -47,7 +47,7 @@ impl StorageProof {
         // First construct the proof and the hash array
         let mut constructed_proof = Vec::with_capacity(proof.len());
         let mut hashes = Vec::with_capacity(proof.len());
-        for (left, right) in proof.iter() {
+        for (left, right) in proof {
             let mut proof_node = Vec::with_capacity(PROOF_NODE_MAX_SIZE_B);
             proof_node.extend_from_slice(left);
             proof_node.extend_from_slice(right);
@@ -105,7 +105,7 @@ impl CircuitFragment for StorageProof {
             let node = &proof_data[i];
 
             let is_proof_node = is_const_less_than(builder, i, proof_len, n_log);
-            let computed_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(node.to_vec());
+            let computed_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(node.clone());
 
             for y in 0..4 {
                 let diff = builder.sub(computed_hash.elements[y], prev_hash.elements[y]);
@@ -145,7 +145,7 @@ impl CircuitFragment for StorageProof {
                     pw.set_target_arr(&targets.proof_data[i], &padded_proof_node)?;
                 }
                 None => pw.set_target_arr(&targets.proof_data[i], &EMPTY_PROOF_NODE)?,
-            };
+            }
         }
 
         let empty_hash = vec![F::ZERO; 4];
@@ -218,7 +218,7 @@ pub mod tests {
     use rand::Rng;
 
     fn run_test(
-        storage_proof: StorageProof,
+        storage_proof: &StorageProof,
         inputs: StorageProofInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
@@ -237,22 +237,22 @@ pub mod tests {
             root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
         };
 
-        run_test(storage_proof, inputs).unwrap();
+        run_test(&storage_proof, inputs).unwrap();
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "set twice with different values")]
     fn invalid_root_hash_fails() {
         let proof = StorageProof::default();
         let inputs = StorageProofInputs {
             root_hash: [0u8; 32],
         };
 
-        run_test(proof, inputs).unwrap();
+        run_test(&proof, inputs).unwrap();
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "set twice with different values")]
     fn tampered_proof_fails() {
         let mut tampered_proof = default_proof();
 
@@ -264,16 +264,17 @@ pub mod tests {
             root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
         };
 
-        run_test(proof, inputs).unwrap();
+        run_test(&proof, inputs).unwrap();
     }
 
     #[ignore = "performance"]
     #[test]
     fn fuzz_tampered_proof() {
+        const FUZZ_ITERATIONS: usize = 1000;
+
         let mut rng = rand::rng();
 
         // Number of fuzzing iterations
-        const FUZZ_ITERATIONS: usize = 1000;
         let mut panic_count = 0;
 
         for i in 0..FUZZ_ITERATIONS {
@@ -297,21 +298,20 @@ pub mod tests {
 
             // Catch panic from run_test
             let result = panic::catch_unwind(|| {
-                run_test(proof, inputs).unwrap();
+                run_test(&proof, inputs).unwrap();
             });
 
             if result.is_err() {
                 panic_count += 1;
             } else {
                 // Optionally log cases where tampering didn't cause a panic
-                println!("Iteration {}: No panic occurred for tampered proof", i);
+                println!("Iteration {i}: No panic occurred for tampered proof");
             }
         }
 
         assert_eq!(
             panic_count, FUZZ_ITERATIONS,
-            "Only {} out of {} iterations panicked",
-            panic_count, FUZZ_ITERATIONS
+            "Only {panic_count} out of {FUZZ_ITERATIONS} iterations panicked",
         );
     }
 }

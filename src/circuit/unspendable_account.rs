@@ -52,9 +52,9 @@ pub struct UnspendableAccountInputs {
 }
 
 impl UnspendableAccountInputs {
-    pub fn new(preimage: &[u8]) -> anyhow::Result<Self> {
+    pub fn new(preimage: &[u8]) -> Self {
         let preimage = slice_to_field_elements(preimage);
-        Ok(Self { preimage })
+        Self { preimage }
     }
 }
 
@@ -111,6 +111,7 @@ pub mod test_helpers {
     ];
 
     /// An array of addresses generated from the Resoncance Node with `./resonance-node key resonance --scheme wormhole`.
+    #[allow(dead_code)]
     pub const ADRESSES: [&str; 5] = [
         "7b434935e653afd2b20726488d155cd183114a3cc70fed3c120ef885a0e2145c",
         "c5ed765c4039d6e48fcf26c79165ee1d14d7bfcfa6e4ce6ac4352ab62e6f9cd5",
@@ -129,7 +130,7 @@ pub mod test_helpers {
     impl Default for UnspendableAccountInputs {
         fn default() -> Self {
             let preimage = hex::decode(PREIMAGES[0]).unwrap();
-            Self::new(&preimage).unwrap()
+            Self::new(&preimage)
         }
     }
 }
@@ -149,7 +150,7 @@ pub mod tests {
     };
 
     fn run_test(
-        unspendable_account: UnspendableAccount,
+        unspendable_account: &UnspendableAccount,
         inputs: UnspendableAccountInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
@@ -165,7 +166,7 @@ pub mod tests {
     fn build_and_verify_proof() {
         let unspendable_account = UnspendableAccount::default();
         let inputs = UnspendableAccountInputs::default();
-        run_test(unspendable_account, inputs).unwrap();
+        run_test(&unspendable_account, inputs).unwrap();
     }
 
     #[test]
@@ -173,12 +174,12 @@ pub mod tests {
         for (preimage, address) in PREIMAGES.iter().zip(ADRESSES) {
             let decoded_preimage = hex::decode(preimage).unwrap();
             let unspendable_account = UnspendableAccount::new(&decoded_preimage);
-            let inputs = UnspendableAccountInputs::new(&decoded_preimage).unwrap();
+            let inputs = UnspendableAccountInputs::new(&decoded_preimage);
 
             let address = slice_to_field_elements(&hex::decode(address).unwrap());
             assert_eq!(unspendable_account.account_id.to_vec(), address);
 
-            run_test(unspendable_account, inputs).unwrap();
+            run_test(&unspendable_account, inputs).unwrap();
         }
     }
 
@@ -192,9 +193,9 @@ pub mod tests {
         let wrong_hash = slice_to_field_elements(&hex::decode(wrong_address).unwrap());
         unspendable_account.account_id = wrong_hash.try_into().unwrap();
 
-        let inputs = UnspendableAccountInputs::new(&decoded_preimage).unwrap();
+        let inputs = UnspendableAccountInputs::new(&decoded_preimage);
 
-        let result = run_test(unspendable_account, inputs);
+        let result = run_test(&unspendable_account, inputs);
         assert!(result.is_err());
     }
 
@@ -202,6 +203,6 @@ pub mod tests {
     fn all_zero_preimage_is_valid_and_hashes() {
         let preimage_bytes = vec![0u8; 64];
         let account = UnspendableAccount::new(&preimage_bytes);
-        assert!(!account.account_id.to_vec().iter().all(|x| x.is_zero()));
+        assert!(!account.account_id.to_vec().iter().all(Field::is_zero));
     }
 }
