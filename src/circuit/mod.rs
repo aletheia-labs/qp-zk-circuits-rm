@@ -94,6 +94,7 @@ impl Default for WormholeCircuit {
         // Setup circuits and their targets.
         let amounts = Amounts::circuit(&mut builder);
         let nullifier = Nullifier::circuit(&mut builder);
+        // TODO: Add a dummy check for exit address.
         let unspendable_account = UnspendableAccount::circuit(&mut builder);
         let storage_proof = StorageProof::circuit(&mut builder);
         let targets = CircuitTargets::new(amounts, nullifier, unspendable_account, storage_proof);

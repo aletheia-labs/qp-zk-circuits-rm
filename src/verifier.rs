@@ -2,6 +2,26 @@ use plonky2::plonk::{circuit_data::VerifierCircuitData, proof::ProofWithPublicIn
 
 use crate::circuit::{C, D, F, WormholeCircuit};
 
+/// A verifier for the wormhole circuit.
+///
+///# Example
+///
+/// Create a verifier and verify a proof:
+///
+/// ```
+/// # use wormhole_circuit::prover::{WormholeProver, CircuitInputs};
+/// use wormhole_circuit::verifier::WormholeVerifier;
+/// #
+/// # fn main() -> anyhow::Result<()> {
+/// # let inputs = CircuitInputs::default();
+/// # let prover = WormholeProver::new();
+/// # let proof = prover.commit(inputs)?.prove()?;
+///
+/// let verifier = WormholeVerifier::new();
+/// verifier.verify(proof)?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct WormholeVerifier {
     circuit_data: VerifierCircuitData<F, C, D>,
 }

@@ -165,7 +165,7 @@ fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
     }
 }
 
-#[cfg(any(test, feature = "bench"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_helpers {
     use super::StorageProof;
 

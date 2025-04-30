@@ -12,6 +12,7 @@ use crate::circuit::{
     unspendable_account::{UnspendableAccount, UnspendableAccountInputs},
 };
 
+/// Inputs required to commit to the wormhole circuit.
 #[derive(Debug)]
 pub struct CircuitInputs {
     pub funding_tx_amount: u64,
@@ -23,29 +24,22 @@ pub struct CircuitInputs {
     pub root_hash: [u8; 32],
 }
 
-impl CircuitInputs {
-    pub fn new(
-        funding_tx_amount: u64,
-        exit_amount: u64,
-        fee_amount: u64,
-        nullifier_preimage: Vec<u8>,
-        unspendable_account_preimage: Vec<u8>,
-        storage_proof: Vec<(Vec<u8>, Vec<u8>)>,
-        root_hash: [u8; 32],
-    ) -> Self {
-        Self {
-            funding_tx_amount,
-            exit_amount,
-            fee_amount,
-            nullifier_preimage,
-            unspendable_account_preimage,
-            storage_proof,
-            root_hash,
-        }
-    }
-}
-
 /// A prover for the wormhole circuit.
+///
+/// # Example
+///
+/// Setup prover, commit inputs, and then generate the proof:
+///
+/// ```
+/// use wormhole_circuit::prover::{WormholeProver, CircuitInputs};
+///
+/// # fn main() -> anyhow::Result<()> {
+/// # let inputs = CircuitInputs::default();
+/// let prover = WormholeProver::new();
+/// let proof = prover.commit(inputs)?.prove()?;
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct WormholeProver {
     circuit_data: ProverCircuitData<F, C, D>,
@@ -127,7 +121,7 @@ impl WormholeProver {
     }
 }
 
-#[cfg(any(test, feature = "bench"))]
+#[cfg(any(test, feature = "testing"))]
 pub mod test_helpers {
 
     use crate::circuit::{

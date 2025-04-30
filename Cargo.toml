@@ -15,7 +15,7 @@ rand = "0.9.1"
 
 [features]
 default = []
-bench = []
+testing = []
 
 [[bench]]
 name = "bench"

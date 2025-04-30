@@ -1,4 +1,4 @@
-#![cfg(feature = "bench")]
+#![cfg(feature = "testing")]
 use std::time::Duration;
 
 use criterion::{Criterion, criterion_main};
