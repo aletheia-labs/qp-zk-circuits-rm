@@ -1,3 +1,24 @@
+//! Verifier logic for the Wormhole circuit.
+//!
+//! This module contains the [`WormholeVerifier`] type, which can verify proofs generated
+//! by the [`crate::prover::WormholeProver`].
+//!
+//! # Example
+//!
+//! ```
+//! # use wormhole_circuit::prover::{WormholeProver, CircuitInputs};
+//! use wormhole_circuit::verifier::WormholeVerifier;
+//! #
+//! # fn main() -> anyhow::Result<()> {
+//! # let inputs = CircuitInputs::default();
+//! # let prover = WormholeProver::new();
+//! # let proof = prover.commit(&inputs)?.prove()?;
+//!
+//! let verifier = WormholeVerifier::new();
+//! verifier.verify(proof)?;
+//! # Ok(())
+//! # }
+//! ```
 use plonky2::plonk::{circuit_data::VerifierCircuitData, proof::ProofWithPublicInputs};
 
 use crate::circuit::{C, D, F, WormholeCircuit};
@@ -36,6 +57,7 @@ impl Default for WormholeVerifier {
 }
 
 impl WormholeVerifier {
+    /// Creates a new [`WormholeVerifier`].
     pub fn new() -> Self {
         Self::default()
     }

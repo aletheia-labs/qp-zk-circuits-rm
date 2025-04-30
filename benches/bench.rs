@@ -1,3 +1,4 @@
+//! Benchmarks for the wormhole circuit prover and verifier.
 #![cfg(feature = "testing")]
 use std::time::Duration;
 

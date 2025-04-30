@@ -1,3 +1,6 @@
+//! Wormhole Circuit.
+//!
+//! This module defines the zero-knowledge circuit for the Wormhole protocol.
 use amounts::{Amounts, AmountsTargets};
 use nullifier::{Nullifier, NullifierTargets};
 use plonky2::{

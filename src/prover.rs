@@ -1,3 +1,26 @@
+//! Prover logic for the Wormhole circuit.
+//!
+//! This module provides the [`WormholeProver`] type, which allows committing inputs to the circuit
+//! and generating a zero-knowledge proof using those inputs.
+//!
+//! The typical usage flow involves:
+//! 1. Initializing the prover (e.g., via [`WormholeProver::default`] or [`WormholeProver::new`]).
+//! 2. Creating user inputs with [`CircuitInputs`].
+//! 3. Committing user inputs using [`WormholeProver::commit`].
+//! 4. Generating a proof using [`WormholeProver::prove`].
+//!
+//! # Example
+//!
+//! ```
+//! use wormhole_circuit::prover::{WormholeProver, CircuitInputs};
+//!
+//! # fn main() -> anyhow::Result<()> {
+//! # let inputs = CircuitInputs::default();
+//! let prover = WormholeProver::new();
+//! let proof = prover.commit(&inputs)?.prove()?;
+//! # Ok(())
+//! # }
+//! ```
 use anyhow::bail;
 use plonky2::{
     iop::witness::PartialWitness,
@@ -15,12 +38,22 @@ use crate::circuit::{
 /// Inputs required to commit to the wormhole circuit.
 #[derive(Debug)]
 pub struct CircuitInputs {
+    /// The amount sent in the transaction.
     pub funding_tx_amount: u64,
+    /// Amount to be withdrawn.
     pub exit_amount: u64,
+    /// The fee for the transaction.
     pub fee_amount: u64,
+    /// Raw bytes of the nullifier preimage, used to prevent double spends.
     pub nullifier_preimage: Vec<u8>,
+    /// Raw bytes of the unspendable account preimage.
     pub unspendable_account_preimage: Vec<u8>,
+    /// A sequence of key-value nodes representing the storage proof.
+    ///
+    /// Each element is a tuple where the items are the left and right splits of a proof node split
+    /// in half at the expected childs hash index.
     pub storage_proof: Vec<(Vec<u8>, Vec<u8>)>,
+    /// The root hash of the storage trie.
     pub root_hash: [u8; 32],
 }
 
@@ -64,6 +97,7 @@ impl Default for WormholeProver {
 }
 
 impl WormholeProver {
+    /// Creates a new [`WormholeProver`].
     pub fn new() -> Self {
         Self::default()
     }
@@ -122,8 +156,7 @@ impl WormholeProver {
 }
 
 #[cfg(any(test, feature = "testing"))]
-pub mod test_helpers {
-
+mod test_helpers {
     use crate::circuit::{
         nullifier,
         storage_proof::test_helpers::{ROOT_HASH, default_proof},
@@ -152,7 +185,7 @@ pub mod test_helpers {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::{CircuitInputs, WormholeProver};
 
     #[test]

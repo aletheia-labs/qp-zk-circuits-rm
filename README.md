@@ -1,12 +1,12 @@
-# wormhole-prover
+# Wormhole Circuit
 
 ## Prerequisites
 
-For dependencies, can install them manually - or optionally, use the provided developer environment within the Nix flake.
+You can set up your development environment manually or use the provided Nix flake for a reproducible setup.
 
 ### Manually
 
-Ensure you have Rust installed. You can install Rust using [rustup](https://rustup.rs/):
+Ensure you have Rust installed. If not, you can install Rust using [rustup](https://rustup.rs/):
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -37,8 +37,16 @@ cd wormhole-prover
 
 ## Testing
 
-Run the tests with:
+Run the test suite:
 
 ```sh
-cargo test
+cargo test --features testing
+```
+
+## Benchmarks
+
+To run prover and verifier benchmarks:
+
+```sh
+cargo bench --features testing
 ```
