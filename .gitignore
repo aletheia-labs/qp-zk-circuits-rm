@@ -4,3 +4,4 @@
 .envrc
 
 Cargo.lock
+circuit/.DS_Store
