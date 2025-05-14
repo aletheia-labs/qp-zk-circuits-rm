@@ -7,9 +7,8 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::prover::CircuitInputs;
-
-use super::{CircuitFragment, D, Digest, F, slice_to_field_elements};
+use crate::circuit::{slice_to_field_elements, CircuitFragment, Digest, D, F};
+use crate::inputs::CircuitInputs;
 
 // FIXME: Adjust as needed.
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
@@ -140,8 +139,8 @@ pub mod tests {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
     use crate::circuit::{
-        C,
         tests::{build_and_prove_test, setup_test_builder_and_witness},
+        C,
     };
 
     use super::{

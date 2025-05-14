@@ -1,22 +1,21 @@
-[package]
-name = "wormhole-circuit"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+members = [
+    "circuit",
+    "prover",
+    "verifier",
+]
+resolver = "2"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.95"
-hex = "0.4.3"
 plonky2 = "1.0.2"
-poseidon-resonance = { git = "https://github.com/zeapoz/poseidon-resonance" }
-
-[dev-dependencies]
+poseidon-resonance = { git = "https://github.com/Quantus-Network/poseidon-resonance" }
 criterion = "0.5.1"
 rand = "0.9.1"
 
-[features]
-default = []
-testing = []
-
-[[bench]]
-name = "bench"
-harness = false
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Quantus Network"]
+description = "Wormhole circuit implementation using Plonky2"
+license = "MIT"
