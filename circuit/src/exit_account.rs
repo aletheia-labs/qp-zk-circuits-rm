@@ -1,6 +1,6 @@
 use crate::circuit::{slice_to_field_elements, CircuitFragment, D, F};
 use crate::inputs::CircuitInputs;
-use plonky2::field::types::{Field, Field64, PrimeField64};
+use plonky2::field::types::{Field, PrimeField64};
 use plonky2::{
     hash::hash_types::{HashOut, HashOutTarget},
     iop::witness::{PartialWitness, WitnessWrite},
@@ -83,6 +83,7 @@ mod tests {
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
+    use plonky2::field::types::Field64;
 
     use super::*;
     use plonky2::plonk::proof::ProofWithPublicInputs;
