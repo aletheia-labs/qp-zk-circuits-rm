@@ -62,7 +62,6 @@ impl CircuitFragment for ExitAccount {
     /// Builds a dummy circuit to include the exit account as a public input.
     fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let address = builder.add_virtual_hash_public_input();
-        builder.register_public_inputs(&address.elements);
         ExitAccountTargets { address }
     }
 
