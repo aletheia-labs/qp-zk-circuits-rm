@@ -285,7 +285,7 @@ pub mod tests {
             let node_index = rng.random_range(0..tampered_proof.len());
 
             // Randomly select a byte to flip
-            let byte_index = rng.random_range(0..tampered_proof[0].1.len());
+            let byte_index = rng.random_range(0..tampered_proof[node_index].1.len());
 
             // Flip random bits in the selected byte (e.g., XOR with a random value)
             tampered_proof[node_index].1[byte_index] ^= rng.random_range(1..=255);
