@@ -1,11 +1,11 @@
+use crate::circuit::{slice_to_field_elements, CircuitFragment, D, F};
+use crate::inputs::CircuitInputs;
+use plonky2::field::types::{Field, PrimeField64};
 use plonky2::{
     hash::hash_types::{HashOut, HashOutTarget},
     iop::witness::{PartialWitness, WitnessWrite},
     plonk::circuit_builder::CircuitBuilder,
 };
-use plonky2::field::types::{Field, Field64, PrimeField64};
-use crate::circuit::{slice_to_field_elements, CircuitFragment, D, F};
-use crate::inputs::CircuitInputs;
 
 #[derive(Debug, Default, Eq, PartialEq)]
 pub struct ExitAccount([u8; 32]);
@@ -30,7 +30,9 @@ impl ExitAccount {
     /// Decode [u8; 32] from Vec<F> (expects 4 field elements)
     pub fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
         if elements.len() < 4 {
-            return Err(anyhow::anyhow!("Expected 4 field elements for ExitAccount address"));
+            return Err(anyhow::anyhow!(
+                "Expected 4 field elements for ExitAccount address"
+            ));
         }
         let mut address = [0u8; 32];
         for i in 0..4 {
@@ -114,7 +116,11 @@ mod tests {
         let exit_account = ExitAccount::new([0u8; 32]);
         let elements = exit_account.to_field_elements();
         assert_eq!(elements.len(), 4, "Expected 4 field elements");
-        assert_eq!(elements, vec![F::ZERO; 4], "Zero address should encode to zero elements");
+        assert_eq!(
+            elements,
+            vec![F::ZERO; 4],
+            "Zero address should encode to zero elements"
+        );
         let decoded = ExitAccount::from_field_elements(&elements)?;
         assert_eq!(exit_account, decoded, "Zero address round-trip failed");
         Ok(())
@@ -127,7 +133,11 @@ mod tests {
         assert_eq!(elements.len(), 4, "Expected 4 field elements");
         // Each element should be u64::MAX (0xFFFFFFFFFFFFFFFF)
         let expected_value = F::from_noncanonical_u64(u64::MAX);
-        assert_eq!(elements, vec![expected_value; 4], "Max address encoding incorrect");
+        assert_eq!(
+            elements,
+            vec![expected_value; 4],
+            "Max address encoding incorrect"
+        );
         let decoded = ExitAccount::from_field_elements(&elements)?;
         assert_eq!(exit_account, decoded, "Max address round-trip failed");
         Ok(())
@@ -137,7 +147,10 @@ mod tests {
     fn test_exit_account_insufficient_elements() {
         let elements = vec![F::ZERO; 3]; // Too few elements
         let result = ExitAccount::from_field_elements(&elements);
-        assert!(result.is_err(), "Decoding with insufficient elements should fail");
+        assert!(
+            result.is_err(),
+            "Decoding with insufficient elements should fail"
+        );
         assert_eq!(
             result.unwrap_err().to_string(),
             "Expected 4 field elements for ExitAccount address"
