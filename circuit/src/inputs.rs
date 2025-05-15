@@ -45,7 +45,7 @@ pub mod test_helpers {
                 unspendable_account_preimage,
                 storage_proof: default_proof(),
                 root_hash,
-                exit_account: [0u8; 32],
+                exit_account: [254u8; 32],
             }
         }
     }
