@@ -3,16 +3,42 @@ use plonky2::{
     iop::witness::{PartialWitness, WitnessWrite},
     plonk::circuit_builder::CircuitBuilder,
 };
-
+use plonky2::field::types::{Field, Field64, PrimeField64};
 use crate::circuit::{slice_to_field_elements, CircuitFragment, D, F};
 use crate::inputs::CircuitInputs;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct ExitAccount([u8; 32]);
 
 impl ExitAccount {
     pub fn new(address: [u8; 32]) -> Self {
         Self(address)
+    }
+
+    /// Encode [u8; 32] into Vec<F> (4 field elements, 8 bytes each)
+    pub fn to_field_elements(&self) -> Vec<F> {
+        let mut elements = Vec::with_capacity(4);
+        for i in 0..4 {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(&self.0[i * 8..(i + 1) * 8]);
+            let value = u64::from_le_bytes(bytes);
+            elements.push(F::from_noncanonical_u64(value));
+        }
+        elements
+    }
+
+    /// Decode [u8; 32] from Vec<F> (expects 4 field elements)
+    pub fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
+        if elements.len() < 4 {
+            return Err(anyhow::anyhow!("Expected 4 field elements for ExitAccount address"));
+        }
+        let mut address = [0u8; 32];
+        for i in 0..4 {
+            let value = elements[i].to_noncanonical_u64();
+            let bytes = value.to_le_bytes();
+            address[i * 8..(i + 1) * 8].copy_from_slice(&bytes);
+        }
+        Ok(ExitAccount::new(address))
     }
 }
 
@@ -34,6 +60,7 @@ impl CircuitFragment for ExitAccount {
     /// Builds a dummy circuit to include the exit account as a public input.
     fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
         let address = builder.add_virtual_hash_public_input();
+        builder.register_public_inputs(&address.elements);
         ExitAccountTargets { address }
     }
 
@@ -70,5 +97,69 @@ mod tests {
     fn run_circuit() {
         let exit_account = ExitAccount::default();
         run_test(&exit_account).unwrap();
+    }
+
+    #[test]
+    fn test_exit_account_round_trip() -> anyhow::Result<()> {
+        let exit_account = ExitAccount::new([42u8; 32]);
+        let elements = exit_account.to_field_elements();
+        assert_eq!(elements.len(), 4, "Expected 4 field elements");
+        let decoded = ExitAccount::from_field_elements(&elements)?;
+        assert_eq!(exit_account, decoded, "Round-trip failed");
+        Ok(())
+    }
+
+    #[test]
+    fn test_exit_account_zero_address() -> anyhow::Result<()> {
+        let exit_account = ExitAccount::new([0u8; 32]);
+        let elements = exit_account.to_field_elements();
+        assert_eq!(elements.len(), 4, "Expected 4 field elements");
+        assert_eq!(elements, vec![F::ZERO; 4], "Zero address should encode to zero elements");
+        let decoded = ExitAccount::from_field_elements(&elements)?;
+        assert_eq!(exit_account, decoded, "Zero address round-trip failed");
+        Ok(())
+    }
+
+    #[test]
+    fn test_exit_account_max_address() -> anyhow::Result<()> {
+        let exit_account = ExitAccount::new([255u8; 32]);
+        let elements = exit_account.to_field_elements();
+        assert_eq!(elements.len(), 4, "Expected 4 field elements");
+        // Each element should be u64::MAX (0xFFFFFFFFFFFFFFFF)
+        let expected_value = F::from_noncanonical_u64(u64::MAX);
+        assert_eq!(elements, vec![expected_value; 4], "Max address encoding incorrect");
+        let decoded = ExitAccount::from_field_elements(&elements)?;
+        assert_eq!(exit_account, decoded, "Max address round-trip failed");
+        Ok(())
+    }
+
+    #[test]
+    fn test_exit_account_insufficient_elements() {
+        let elements = vec![F::ZERO; 3]; // Too few elements
+        let result = ExitAccount::from_field_elements(&elements);
+        assert!(result.is_err(), "Decoding with insufficient elements should fail");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Expected 4 field elements for ExitAccount address"
+        );
+    }
+
+    #[test]
+    fn test_exit_account_specific_address() -> anyhow::Result<()> {
+        let mut address = [0u8; 32];
+        address[0] = 1;
+        address[31] = 255; // Non-zero first and last bytes
+        let exit_account = ExitAccount::new(address);
+        let elements = exit_account.to_field_elements();
+        assert_eq!(elements.len(), 4, "Expected 4 field elements");
+        // First element: 0x0000000000000001 (little-endian)
+        // Last element: 0xFF00000000000000
+        let expected_first = F::from_canonical_u64(1);
+        let expected_last = F::from_canonical_u64((255u64 << 56) % F::ORDER);
+        assert_eq!(elements[0], expected_first, "First element incorrect");
+        assert_eq!(elements[3], expected_last, "Last element incorrect");
+        let decoded = ExitAccount::from_field_elements(&elements)?;
+        assert_eq!(exit_account, decoded, "Specific address round-trip failed");
+        Ok(())
     }
 }
