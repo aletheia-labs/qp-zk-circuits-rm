@@ -1,6 +1,7 @@
 pub mod amounts;
 pub mod circuit;
 pub mod exit_account;
+pub mod fcodec;
 pub mod gadgets;
 pub mod inputs;
 pub mod nullifier;

@@ -1,4 +1,5 @@
 use crate::circuit::{slice_to_field_elements, CircuitFragment, D, F};
+use crate::fcodec::FieldElementCodec;
 use crate::inputs::CircuitInputs;
 use plonky2::field::types::{Field, PrimeField64};
 use plonky2::{
@@ -8,15 +9,17 @@ use plonky2::{
 };
 
 #[derive(Debug, Default, Eq, PartialEq)]
-pub struct ExitAccount([u8; 32]);
+pub struct ExitAccount(pub [u8; 32]);
 
 impl ExitAccount {
     pub fn new(address: [u8; 32]) -> Self {
         Self(address)
     }
+}
 
+impl FieldElementCodec for ExitAccount {
     /// Encode [u8; 32] into Vec<F> (4 field elements, 8 bytes each)
-    pub fn to_field_elements(&self) -> Vec<F> {
+    fn to_field_elements(&self) -> Vec<F> {
         let mut elements = Vec::with_capacity(4);
         for i in 0..4 {
             let mut bytes = [0u8; 8];
@@ -28,7 +31,7 @@ impl ExitAccount {
     }
 
     /// Decode [u8; 32] from Vec<F> (expects 4 field elements)
-    pub fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
+    fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
         if elements.len() < 4 {
             return Err(anyhow::anyhow!(
                 "Expected 4 field elements for ExitAccount address"
