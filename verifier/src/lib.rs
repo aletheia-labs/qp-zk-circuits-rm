@@ -101,7 +101,7 @@ mod tests {
         for ix in 0..proof.public_inputs.len() {
             let mut p = proof.clone();
             for jx in 0..8 {
-                p.public_inputs[ix].0 ^= 255 << 8 * jx;
+                p.public_inputs[ix].0 ^= 255 << (8 * jx);
                 let result = verifier.verify(p.clone());
                 assert!(
                     result.is_err(),
