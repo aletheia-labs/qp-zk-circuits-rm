@@ -7,8 +7,11 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::circuit::{slice_to_field_elements, CircuitFragment, Digest, D, F};
 use crate::inputs::CircuitInputs;
+use crate::{
+    circuit::{slice_to_field_elements, CircuitFragment, Digest, D, F},
+    fcodec::FieldElementCodec,
+};
 
 // FIXME: Adjust as needed.
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
@@ -25,6 +28,24 @@ impl Nullifier {
         let hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
 
         Self { hash }
+    }
+}
+
+impl FieldElementCodec for Nullifier {
+    fn to_field_elements(&self) -> Vec<F> {
+        self.hash.to_vec()
+    }
+
+    fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
+        if elements.len() != 4 {
+            return Err(anyhow::anyhow!(
+                "Expected 4 field elements for Nullifier, got: {}",
+                elements.len()
+            ));
+        }
+
+        let hash = elements.try_into()?;
+        Ok(Self { hash })
     }
 }
 
