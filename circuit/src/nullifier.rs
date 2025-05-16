@@ -16,7 +16,7 @@ use crate::{
 // FIXME: Adjust as needed.
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Nullifier {
     hash: Digest,
 }
@@ -178,5 +178,53 @@ pub mod tests {
         let preimage_bytes = vec![0u8; 64];
         let nullifier = Nullifier::new(&preimage_bytes);
         assert!(!nullifier.hash.to_vec().iter().all(Field::is_zero));
+    }
+
+    #[test]
+    fn nullifier_codec() {
+        let nullifier = Nullifier {
+            hash: [
+                F::from_noncanonical_u64(1),
+                F::from_noncanonical_u64(2),
+                F::from_noncanonical_u64(3),
+                F::from_noncanonical_u64(4),
+            ],
+        };
+
+        // Encode the account as field elements and compare.
+        let field_elements = nullifier.to_field_elements();
+        assert_eq!(field_elements.len(), 4);
+        assert_eq!(field_elements[0], F::from_noncanonical_u64(1));
+        assert_eq!(field_elements[1], F::from_noncanonical_u64(2));
+        assert_eq!(field_elements[2], F::from_noncanonical_u64(3));
+        assert_eq!(field_elements[3], F::from_noncanonical_u64(4));
+
+        // Decode the field elements back into an UnspendableAccount
+        let recovered_nullifier = Nullifier::from_field_elements(&field_elements).unwrap();
+        assert_eq!(nullifier, recovered_nullifier);
+    }
+
+    #[test]
+    fn codec_invalid_length() {
+        let invalid_elements = vec![F::from_noncanonical_u64(1), F::from_noncanonical_u64(2)];
+        let recovered_nullifier_result = Nullifier::from_field_elements(&invalid_elements);
+
+        assert!(recovered_nullifier_result.is_err());
+        assert_eq!(
+            recovered_nullifier_result.unwrap_err().to_string(),
+            "Expected 4 field elements for Nullifier, got: 2"
+        );
+    }
+
+    #[test]
+    fn codec_empty_elements() {
+        let empty_elements: Vec<F> = vec![];
+        let recovered_nullifier_result = Nullifier::from_field_elements(&empty_elements);
+
+        assert!(recovered_nullifier_result.is_err());
+        assert_eq!(
+            recovered_nullifier_result.unwrap_err().to_string(),
+            "Expected 4 field elements for Nullifier, got: 0"
+        );
     }
 }

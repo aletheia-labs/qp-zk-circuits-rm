@@ -7,10 +7,13 @@ use plonky2::{
     plonk::circuit_builder::CircuitBuilder,
 };
 
-use crate::circuit::{CircuitFragment, D, F};
 use crate::inputs::CircuitInputs;
+use crate::{
+    circuit::{CircuitFragment, D, F},
+    fcodec::FieldElementCodec,
+};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Amounts {
     /// The amount that a wormhole deposit adress was funded with
     pub funding_tx_amount: F,
@@ -27,6 +30,27 @@ impl Amounts {
             exit_amount: F::from_noncanonical_u64(exit_amount),
             fee_amount: F::from_noncanonical_u64(fee_amount),
         }
+    }
+}
+
+impl FieldElementCodec for Amounts {
+    /// Encode [u8; 32] into Vec<F> (4 field elements, 8 bytes each).
+    fn to_field_elements(&self) -> Vec<F> {
+        [self.funding_tx_amount, self.exit_amount, self.fee_amount].to_vec()
+    }
+
+    /// Decode [u8; 32] from Vec<F> (expects 4 field elements).
+    fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
+        if elements.len() != 3 {
+            return Err(anyhow::anyhow!(
+                "Expected 3 field elements for ExitAccount address"
+            ));
+        }
+        Ok(Self {
+            funding_tx_amount: elements[0],
+            exit_amount: elements[1],
+            fee_amount: elements[2],
+        })
     }
 }
 
@@ -146,5 +170,67 @@ mod tests {
         let amounts = Amounts::new(100, 10, 100);
         let result = run_test(&amounts);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn amounts_codec() {
+        let amounts = Amounts {
+            funding_tx_amount: F::from_noncanonical_u64(123),
+            exit_amount: F::from_noncanonical_u64(456),
+            fee_amount: F::from_noncanonical_u64(789),
+        };
+
+        let field_elements = amounts.to_field_elements();
+        assert_eq!(field_elements.len(), 3);
+        assert_eq!(
+            amounts,
+            Amounts::from_field_elements(&field_elements).unwrap()
+        );
+    }
+
+    #[test]
+    fn invalid_length() {
+        let short_elements = vec![F::from_noncanonical_u64(1), F::from_noncanonical_u64(2)];
+        assert!(Amounts::from_field_elements(&short_elements).is_err());
+
+        let long_elements = vec![
+            F::from_noncanonical_u64(1),
+            F::from_noncanonical_u64(2),
+            F::from_noncanonical_u64(3),
+            F::from_noncanonical_u64(4),
+        ];
+        assert!(Amounts::from_field_elements(&long_elements).is_err());
+    }
+
+    #[test]
+    fn empty_elements() {
+        let empty_elements: Vec<F> = vec![];
+        assert!(Amounts::from_field_elements(&empty_elements).is_err());
+    }
+
+    #[test]
+    fn zero_values() {
+        let zero_amounts = Amounts {
+            funding_tx_amount: F::from_noncanonical_u64(0),
+            exit_amount: F::from_noncanonical_u64(0),
+            fee_amount: F::from_noncanonical_u64(0),
+        };
+        assert_eq!(
+            zero_amounts,
+            Amounts::from_field_elements(&zero_amounts.to_field_elements()).unwrap()
+        );
+    }
+
+    #[test]
+    fn different_values() {
+        let different_amounts = Amounts {
+            funding_tx_amount: F::from_noncanonical_u64(987),
+            exit_amount: F::from_noncanonical_u64(654),
+            fee_amount: F::from_noncanonical_u64(321),
+        };
+        assert_eq!(
+            different_amounts,
+            Amounts::from_field_elements(&different_amounts.to_field_elements()).unwrap()
+        );
     }
 }

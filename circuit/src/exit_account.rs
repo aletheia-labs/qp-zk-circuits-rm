@@ -32,7 +32,7 @@ impl FieldElementCodec for ExitAccount {
 
     /// Decode [u8; 32] from Vec<F> (expects 4 field elements)
     fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
-        if elements.len() < 4 {
+        if elements.len() != 4 {
             return Err(anyhow::anyhow!(
                 "Expected 4 field elements for ExitAccount address"
             ));
@@ -177,5 +177,98 @@ mod tests {
         let decoded = ExitAccount::from_field_elements(&elements)?;
         assert_eq!(exit_account, decoded, "Specific address round-trip failed");
         Ok(())
+    }
+
+    #[test]
+    fn exit_account_codec() {
+        let address_bytes = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25, 26, 27, 28, 29, 30, 31, 32,
+        ];
+        let account = ExitAccount::new(address_bytes);
+
+        // Encode the account's address into field elements.
+        let field_elements = account.to_field_elements();
+        assert_eq!(field_elements.len(), 4);
+
+        // Reconstruct the original bytes from the field elements.
+        let mut expected_elements = Vec::new();
+        for i in 0..4 {
+            let mut bytes = [0u8; 8];
+            bytes.copy_from_slice(&address_bytes[i * 8..(i + 1) * 8]);
+            let value = u64::from_le_bytes(bytes);
+            expected_elements.push(F::from_noncanonical_u64(value));
+        }
+        assert_eq!(field_elements, expected_elements);
+
+        // Decode the field elements back into an ExitAccount.
+        let recovered_account = ExitAccount::from_field_elements(&field_elements).unwrap();
+        assert_eq!(account, recovered_account);
+    }
+
+    #[test]
+    fn codec_invalid_length() {
+        let short_elements = vec![F::from_noncanonical_u64(1), F::from_noncanonical_u64(2)];
+        let recovered_account_result = ExitAccount::from_field_elements(&short_elements);
+
+        assert!(recovered_account_result.is_err());
+        assert_eq!(
+            recovered_account_result.unwrap_err().to_string(),
+            "Expected 4 field elements for ExitAccount address"
+        );
+
+        let long_elements = vec![
+            F::from_noncanonical_u64(1),
+            F::from_noncanonical_u64(2),
+            F::from_noncanonical_u64(3),
+            F::from_noncanonical_u64(4),
+            F::from_noncanonical_u64(5),
+        ];
+
+        let recovered_account_result = ExitAccount::from_field_elements(&long_elements);
+        assert!(recovered_account_result.is_err());
+        assert_eq!(
+            recovered_account_result.unwrap_err().to_string(),
+            "Expected 4 field elements for ExitAccount address"
+        );
+    }
+
+    #[test]
+    fn codec_empty_elements() {
+        let empty_elements: Vec<F> = vec![];
+        let recovered_account_result = ExitAccount::from_field_elements(&empty_elements);
+        assert!(recovered_account_result.is_err());
+        assert_eq!(
+            recovered_account_result.unwrap_err().to_string(),
+            "Expected 4 field elements for ExitAccount address"
+        );
+    }
+
+    #[test]
+    fn codec_different_byte_patterns() {
+        // Test with all zeros.
+        let zero_address = [0u8; 32];
+        let account_zero = ExitAccount::new(zero_address);
+        let field_elements_zero = account_zero.to_field_elements();
+        let recovered_zero = ExitAccount::from_field_elements(&field_elements_zero).unwrap();
+        assert_eq!(account_zero, recovered_zero);
+
+        // Test with all ones.
+        let one_address = [1u8; 32];
+        let account_one = ExitAccount::new(one_address);
+        let field_elements_one = account_one.to_field_elements();
+        let recovered_one = ExitAccount::from_field_elements(&field_elements_one).unwrap();
+        assert_eq!(account_one, recovered_one);
+
+        // Test with a more varied pattern.
+        let varied_address = [
+            0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF,
+            0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x21, 0x43, 0x65, 0x87, 0xA9, 0xCB,
+            0xE1, 0xF0, 0x34, 0x56,
+        ];
+        let account_varied = ExitAccount::new(varied_address);
+        let field_elements_varied = account_varied.to_field_elements();
+        let recovered_varied = ExitAccount::from_field_elements(&field_elements_varied).unwrap();
+        assert_eq!(account_varied, recovered_varied);
     }
 }

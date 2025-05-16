@@ -18,7 +18,7 @@ pub const PREIMAGE_NUM_TARGETS: usize = 5;
 
 pub type AccountId = Digest;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UnspendableAccount {
     account_id: AccountId,
 }
@@ -44,7 +44,7 @@ impl FieldElementCodec for UnspendableAccount {
     fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
         if elements.len() != 4 {
             return Err(anyhow::anyhow!(
-                "Expected 4 field elements for Nullifier, got: {}",
+                "Expected 4 field elements for Unspendable Account, got: {}",
                 elements.len()
             ));
         }
@@ -224,5 +224,53 @@ pub mod tests {
         let preimage_bytes = vec![0u8; 64];
         let account = UnspendableAccount::new(&preimage_bytes);
         assert!(!account.account_id.to_vec().iter().all(Field::is_zero));
+    }
+
+    #[test]
+    fn unspendable_account_codec() {
+        let account = UnspendableAccount {
+            account_id: [
+                F::from_noncanonical_u64(1),
+                F::from_noncanonical_u64(2),
+                F::from_noncanonical_u64(3),
+                F::from_noncanonical_u64(4),
+            ],
+        };
+
+        // Encode the account as field elements and compare.
+        let field_elements = account.to_field_elements();
+        assert_eq!(field_elements.len(), 4);
+        assert_eq!(field_elements[0], F::from_noncanonical_u64(1));
+        assert_eq!(field_elements[1], F::from_noncanonical_u64(2));
+        assert_eq!(field_elements[2], F::from_noncanonical_u64(3));
+        assert_eq!(field_elements[3], F::from_noncanonical_u64(4));
+
+        // Decode the field elements back into an UnspendableAccount
+        let recovered_account = UnspendableAccount::from_field_elements(&field_elements).unwrap();
+        assert_eq!(account, recovered_account);
+    }
+
+    #[test]
+    fn codec_invalid_length() {
+        let invalid_elements = vec![F::from_noncanonical_u64(1), F::from_noncanonical_u64(2)];
+        let recovered_account_result = UnspendableAccount::from_field_elements(&invalid_elements);
+
+        assert!(recovered_account_result.is_err());
+        assert_eq!(
+            recovered_account_result.unwrap_err().to_string(),
+            "Expected 4 field elements for Unspendable Account, got: 2"
+        );
+    }
+
+    #[test]
+    fn codec_empty_elements() {
+        let empty_elements: Vec<F> = vec![];
+        let recovered_account_result = UnspendableAccount::from_field_elements(&empty_elements);
+
+        assert!(recovered_account_result.is_err());
+        assert_eq!(
+            recovered_account_result.unwrap_err().to_string(),
+            "Expected 4 field elements for Unspendable Account, got: 0"
+        );
     }
 }
