@@ -84,9 +84,9 @@ impl WormholeProver {
         let storage_proof = StorageProof::from(circuit_inputs);
         let exit_account = ExitAccount::from(circuit_inputs);
 
-        let nullifier_inputs = NullifierInputs::new(&circuit_inputs.nullifier_preimage);
+        let nullifier_inputs = NullifierInputs::new(&circuit_inputs.private.nullifier_preimage);
         let unspendable_account_inputs =
-            UnspendableAccountInputs::new(&circuit_inputs.unspendable_account_preimage);
+            UnspendableAccountInputs::new(&circuit_inputs.private.unspendable_account_preimage);
 
         amounts.fill_targets(&mut self.partial_witness, targets.amounts, ())?;
         nullifier.fill_targets(
@@ -102,7 +102,7 @@ impl WormholeProver {
         storage_proof.fill_targets(
             &mut self.partial_witness,
             targets.storage_proof,
-            StorageProofInputs::new(circuit_inputs.root_hash),
+            StorageProofInputs::new(circuit_inputs.public.root_hash),
         )?;
         exit_account.fill_targets(&mut self.partial_witness, targets.exit_account, ())?;
 
@@ -134,5 +134,28 @@ mod tests {
         let prover = WormholeProver::new();
         let inputs = CircuitInputs::default();
         prover.commit(&inputs).unwrap().prove().unwrap();
+    }
+
+    #[test]
+    #[ignore = "debug"]
+    #[cfg(feature = "testing")]
+    fn get_public_inputs() {
+        let prover = WormholeProver::new();
+        let inputs = CircuitInputs::default();
+        let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+        let public_inputs = proof.public_inputs;
+        println!("{:?}", public_inputs);
+    }
+
+    #[test]
+    #[cfg(feature = "testing")]
+    fn proof_can_be_deserialized() {
+        use wormhole_circuit::inputs::PublicCircuitInputs;
+
+        let prover = WormholeProver::new();
+        let inputs = CircuitInputs::default();
+        let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+        let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
+        println!("{:?}", public_inputs);
     }
 }

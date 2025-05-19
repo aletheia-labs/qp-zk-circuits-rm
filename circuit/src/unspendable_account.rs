@@ -20,7 +20,7 @@ pub type AccountId = Digest;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct UnspendableAccount {
-    account_id: AccountId,
+    pub account_id: AccountId,
 }
 
 impl UnspendableAccount {
@@ -55,8 +55,8 @@ impl FieldElementCodec for UnspendableAccount {
 }
 
 impl From<&CircuitInputs> for UnspendableAccount {
-    fn from(value: &CircuitInputs) -> Self {
-        Self::new(&value.unspendable_account_preimage)
+    fn from(inputs: &CircuitInputs) -> Self {
+        Self::new(&inputs.private.unspendable_account_preimage)
     }
 }
 

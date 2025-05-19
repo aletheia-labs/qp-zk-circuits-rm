@@ -18,7 +18,7 @@ pub const PREIMAGE_NUM_TARGETS: usize = 5;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Nullifier {
-    hash: Digest,
+    pub hash: Digest,
 }
 
 impl Nullifier {
@@ -50,8 +50,8 @@ impl FieldElementCodec for Nullifier {
 }
 
 impl From<&CircuitInputs> for Nullifier {
-    fn from(value: &CircuitInputs) -> Self {
-        Self::new(&value.nullifier_preimage)
+    fn from(inputs: &CircuitInputs) -> Self {
+        Self::new(&inputs.private.nullifier_preimage)
     }
 }
 
