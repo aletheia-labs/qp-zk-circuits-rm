@@ -79,6 +79,15 @@ pub struct UnspendableAccountTargets {
     preimage: Vec<Target>,
 }
 
+impl UnspendableAccountTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        Self {
+            account_id: builder.add_virtual_hash_public_input(),
+            preimage: builder.add_virtual_targets(PREIMAGE_NUM_TARGETS),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct UnspendableAccountInputs {
     preimage: Vec<F>,
@@ -96,10 +105,13 @@ impl CircuitFragment for UnspendableAccount {
     type Targets = UnspendableAccountTargets;
 
     /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
-    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let account_id = builder.add_virtual_hash_public_input();
-        let preimage = builder.add_virtual_targets(PREIMAGE_NUM_TARGETS);
-
+    fn circuit(
+        Self::Targets {
+            account_id,
+            preimage,
+        }: Self::Targets,
+        builder: &mut CircuitBuilder<F, D>,
+    ) {
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
         let generated_account =
@@ -107,11 +119,6 @@ impl CircuitFragment for UnspendableAccount {
 
         // Assert that hashes are equal.
         builder.connect_hashes(generated_account, account_id);
-
-        UnspendableAccountTargets {
-            account_id,
-            preimage,
-        }
     }
 
     fn fill_targets(
@@ -187,7 +194,8 @@ pub mod tests {
         inputs: UnspendableAccountInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = UnspendableAccount::circuit(&mut builder);
+        let targets = UnspendableAccountTargets::new(&mut builder);
+        UnspendableAccount::circuit(targets.clone(), &mut builder);
 
         unspendable_account
             .fill_targets(&mut pw, targets, inputs)

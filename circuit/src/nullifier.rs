@@ -74,6 +74,15 @@ pub struct NullifierTargets {
     preimage: Vec<Target>,
 }
 
+impl NullifierTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        Self {
+            hash: builder.add_virtual_hash_public_input(),
+            preimage: builder.add_virtual_targets(PREIMAGE_NUM_TARGETS),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct NullifierInputs {
     preimage: Vec<F>,
@@ -92,10 +101,10 @@ impl CircuitFragment for Nullifier {
 
     /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
     /// extrinsic_index + secret))`
-    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let hash = builder.add_virtual_hash_public_input();
-        let preimage = builder.add_virtual_targets(PREIMAGE_NUM_TARGETS);
-
+    fn circuit(
+        Self::Targets { hash, preimage }: Self::Targets,
+        builder: &mut CircuitBuilder<F, D>,
+    ) {
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
         let computed_hash =
@@ -103,8 +112,6 @@ impl CircuitFragment for Nullifier {
 
         // Assert that hashes are equal.
         builder.connect_hashes(computed_hash, hash);
-
-        NullifierTargets { hash, preimage }
     }
 
     fn fill_targets(
@@ -159,7 +166,8 @@ pub mod tests {
         inputs: NullifierInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = Nullifier::circuit(&mut builder);
+        let targets = NullifierTargets::new(&mut builder);
+        Nullifier::circuit(targets.clone(), &mut builder);
 
         nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
         build_and_prove_test(builder, pw)

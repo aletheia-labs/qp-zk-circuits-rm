@@ -5,6 +5,7 @@ use plonky2::{
         poseidon::PoseidonHash,
     },
     iop::{target::Target, witness::WitnessWrite},
+    plonk::circuit_builder::CircuitBuilder,
 };
 
 use crate::circuit::{slice_to_field_elements, CircuitFragment, D, F};
@@ -32,6 +33,27 @@ pub struct StorageProofTargets {
     pub proof_len: Target,
     pub proof_data: Vec<Vec<Target>>,
     pub hashes: Vec<HashOutTarget>,
+}
+
+impl StorageProofTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        // Setup targets. Each 8-bytes are represented as their equivalent field element. We also
+        // need to track total proof length to allow for variable length.
+        let proof_data: Vec<_> = (0..MAX_PROOF_LEN)
+            .map(|_| builder.add_virtual_targets(PROOF_NODE_MAX_SIZE_F))
+            .collect();
+
+        let hashes: Vec<_> = (0..MAX_PROOF_LEN)
+            .map(|_| builder.add_virtual_hash())
+            .collect();
+
+        Self {
+            root_hash: builder.add_virtual_hash_public_input(),
+            proof_len: builder.add_virtual_target(),
+            proof_data,
+            hashes,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -78,25 +100,14 @@ impl CircuitFragment for StorageProof {
     type Targets = StorageProofTargets;
 
     fn circuit(
-        builder: &mut plonky2::plonk::circuit_builder::CircuitBuilder<F, D>,
-    ) -> Self::Targets {
-        // Setup targets. Each 8-bytes are represented as their equivalent field element. We also
-        // need to track total proof length to allow for variable length.
-        let proof_len = builder.add_virtual_target();
-
-        let root_hash = builder.add_virtual_hash_public_input();
-        let mut proof_data = Vec::with_capacity(MAX_PROOF_LEN);
-        for _ in 0..MAX_PROOF_LEN {
-            let proof_node = builder.add_virtual_targets(PROOF_NODE_MAX_SIZE_F);
-            proof_data.push(proof_node);
-        }
-
-        let mut hashes = Vec::with_capacity(MAX_PROOF_LEN);
-        for _ in 0..MAX_PROOF_LEN {
-            let hash = builder.add_virtual_hash();
-            hashes.push(hash);
-        }
-
+        Self::Targets {
+            root_hash,
+            proof_len,
+            proof_data,
+            hashes,
+        }: Self::Targets,
+        builder: &mut CircuitBuilder<F, D>,
+    ) {
         // Setup constraints.
         // The first node should be the root node so we initialize `prev_hash` to the provided `root_hash`.
         let mut prev_hash = root_hash;
@@ -116,13 +127,6 @@ impl CircuitFragment for StorageProof {
 
             // Update `prev_hash` to the hash of the child that's stored within this node.
             prev_hash = hashes[i];
-        }
-
-        StorageProofTargets {
-            root_hash,
-            proof_len,
-            proof_data,
-            hashes,
         }
     }
 
@@ -222,7 +226,8 @@ pub mod tests {
         inputs: StorageProofInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = StorageProof::circuit(&mut builder);
+        let targets = StorageProofTargets::new(&mut builder);
+        StorageProof::circuit(targets.clone(), &mut builder);
 
         storage_proof
             .fill_targets(&mut pw, targets, inputs)

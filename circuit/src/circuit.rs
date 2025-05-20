@@ -28,8 +28,8 @@ pub trait CircuitFragment {
     type PrivateInputs;
     type Targets;
 
-    /// Builds a circuit and returns the targets used for filling in the witness values.
-    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets;
+    /// Builds a circuit with the operating wires being provided by `Self::Targets`.
+    fn circuit(targets: Self::Targets, builder: &mut CircuitBuilder<F, D>);
 
     /// Fills the targets in the partial witness with the provided inputs.
     fn fill_targets(
@@ -79,6 +79,18 @@ pub struct CircuitTargets {
     pub exit_account: ExitAccountTargets,
 }
 
+impl CircuitTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        Self {
+            amounts: AmountsTargets::new(builder),
+            nullifier: NullifierTargets::new(builder),
+            unspendable_account: UnspendableAccountTargets::new(builder),
+            storage_proof: StorageProofTargets::new(builder),
+            exit_account: ExitAccountTargets::new(builder),
+        }
+    }
+}
+
 pub struct WormholeCircuit {
     builder: CircuitBuilder<F, D>,
     targets: CircuitTargets,
@@ -89,20 +101,20 @@ impl Default for WormholeCircuit {
         let config = CircuitConfig::standard_recursion_config();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        // Setup circuits and their targets.
-        let amounts = Amounts::circuit(&mut builder);
-        let nullifier = Nullifier::circuit(&mut builder);
-        let unspendable_account = UnspendableAccount::circuit(&mut builder);
-        let storage_proof = StorageProof::circuit(&mut builder);
-        let exit_account = ExitAccount::circuit(&mut builder);
+        // Setup targets.
+        let targets = CircuitTargets::new(&mut builder);
 
-        let targets = CircuitTargets {
-            amounts,
-            nullifier,
-            unspendable_account,
-            storage_proof,
-            exit_account,
-        };
+        // Setup circuits.
+        {
+            // Clone targets so we can pass them to the circuits but keep ownership within
+            // `WormholeCircuit`.
+            let targets = targets.clone();
+            Amounts::circuit(targets.amounts, &mut builder);
+            Nullifier::circuit(targets.nullifier, &mut builder);
+            UnspendableAccount::circuit(targets.unspendable_account, &mut builder);
+            StorageProof::circuit(targets.storage_proof, &mut builder);
+            ExitAccount::circuit(targets.exit_account, &mut builder);
+        }
 
         Self { builder, targets }
     }
