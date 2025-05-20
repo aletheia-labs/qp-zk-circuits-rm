@@ -16,17 +16,6 @@ pub const MAX_PROOF_LEN: usize = 64;
 pub const PROOF_NODE_MAX_SIZE_F: usize = 73;
 pub const PROOF_NODE_MAX_SIZE_B: usize = 256;
 
-#[derive(Debug, Default)]
-pub struct StorageProofInputs {
-    pub root_hash: [u8; 32],
-}
-
-impl StorageProofInputs {
-    pub fn new(root_hash: [u8; 32]) -> Self {
-        Self { root_hash }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct StorageProofTargets {
     pub root_hash: HashOutTarget,
@@ -60,12 +49,13 @@ impl StorageProofTargets {
 pub struct StorageProof {
     proof: Vec<Vec<F>>,
     hashes: Vec<Vec<F>>,
+    root_hash: [u8; 32],
 }
 
 impl StorageProof {
     /// The input is a storage proof as a tuple where each part is split at the index where the child node's
-    /// hash, if any, appears within this proof node
-    pub fn new(proof: &[(Vec<u8>, Vec<u8>)]) -> Self {
+    /// hash, if any, appears within this proof node; and a root hash.
+    pub fn new(proof: &[(Vec<u8>, Vec<u8>)], root_hash: [u8; 32]) -> Self {
         // First construct the proof and the hash array
         let mut constructed_proof = Vec::with_capacity(proof.len());
         let mut hashes = Vec::with_capacity(proof.len());
@@ -85,18 +75,19 @@ impl StorageProof {
         StorageProof {
             proof: constructed_proof,
             hashes,
+            root_hash,
         }
     }
 }
 
 impl From<&CircuitInputs> for StorageProof {
     fn from(inputs: &CircuitInputs) -> Self {
-        Self::new(&inputs.private.storage_proof)
+        Self::new(&inputs.private.storage_proof, inputs.public.root_hash)
     }
 }
 
 impl CircuitFragment for StorageProof {
-    type PrivateInputs = StorageProofInputs;
+    type PrivateInputs = ();
     type Targets = StorageProofTargets;
 
     fn circuit(
@@ -134,11 +125,11 @@ impl CircuitFragment for StorageProof {
         &self,
         pw: &mut plonky2::iop::witness::PartialWitness<F>,
         targets: Self::Targets,
-        inputs: Self::PrivateInputs,
+        _inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         const EMPTY_PROOF_NODE: [F; PROOF_NODE_MAX_SIZE_F] = [F::ZERO; PROOF_NODE_MAX_SIZE_F];
 
-        pw.set_hash_target(targets.root_hash, slice_to_hashout(&inputs.root_hash))?;
+        pw.set_hash_target(targets.root_hash, slice_to_hashout(&self.root_hash))?;
         pw.set_target(targets.proof_len, F::from_canonical_usize(self.proof.len()))?;
 
         for i in 0..MAX_PROOF_LEN {
@@ -191,7 +182,7 @@ pub mod test_helpers {
 
     impl Default for StorageProof {
         fn default() -> Self {
-            StorageProof::new(&default_proof())
+            StorageProof::new(&default_proof(), default_root_hash())
         }
     }
 
@@ -204,6 +195,10 @@ pub mod test_helpers {
             })
             .to_vec()
     }
+
+    pub fn default_root_hash() -> [u8; 32] {
+        hex::decode(ROOT_HASH).unwrap().try_into().unwrap()
+    }
 }
 
 #[cfg(test)]
@@ -212,7 +207,7 @@ pub mod tests {
     use std::panic;
 
     use super::{
-        test_helpers::{default_proof, ROOT_HASH},
+        test_helpers::{default_proof, default_root_hash},
         *,
     };
     use crate::circuit::{
@@ -221,39 +216,26 @@ pub mod tests {
     };
     use rand::Rng;
 
-    fn run_test(
-        storage_proof: &StorageProof,
-        inputs: StorageProofInputs,
-    ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+    fn run_test(storage_proof: &StorageProof) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = StorageProofTargets::new(&mut builder);
         StorageProof::circuit(&targets, &mut builder);
 
-        storage_proof
-            .fill_targets(&mut pw, targets, inputs)
-            .unwrap();
+        storage_proof.fill_targets(&mut pw, targets, ()).unwrap();
         build_and_prove_test(builder, pw)
     }
 
     #[test]
     fn build_and_verify_proof() {
         let storage_proof = StorageProof::default();
-        let inputs = StorageProofInputs {
-            root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
-        };
-
-        run_test(&storage_proof, inputs).unwrap();
+        run_test(&storage_proof).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "set twice with different values")]
     fn invalid_root_hash_fails() {
         let proof = StorageProof::default();
-        let inputs = StorageProofInputs {
-            root_hash: [0u8; 32],
-        };
-
-        run_test(&proof, inputs).unwrap();
+        run_test(&proof).unwrap();
     }
 
     #[test]
@@ -263,13 +245,9 @@ pub mod tests {
 
         // Flip the first byte in the first node hash.
         tampered_proof[0].1[0] ^= 0xFF;
+        let proof = StorageProof::new(&tampered_proof, default_root_hash());
 
-        let proof = StorageProof::new(&tampered_proof);
-        let inputs = StorageProofInputs {
-            root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
-        };
-
-        run_test(&proof, inputs).unwrap();
+        run_test(&proof).unwrap();
     }
 
     #[ignore = "performance"]
@@ -296,14 +274,11 @@ pub mod tests {
             tampered_proof[node_index].1[byte_index] ^= rng.random_range(1..=255);
 
             // Create the proof and inputs
-            let proof = StorageProof::new(&tampered_proof);
-            let inputs = StorageProofInputs {
-                root_hash: hex::decode(ROOT_HASH).unwrap().try_into().unwrap(),
-            };
+            let proof = StorageProof::new(&tampered_proof, default_root_hash());
 
             // Catch panic from run_test
             let result = panic::catch_unwind(|| {
-                run_test(&proof, inputs).unwrap();
+                run_test(&proof).unwrap();
             });
 
             if result.is_err() {
