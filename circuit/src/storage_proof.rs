@@ -100,12 +100,12 @@ impl CircuitFragment for StorageProof {
     type Targets = StorageProofTargets;
 
     fn circuit(
-        Self::Targets {
+        &Self::Targets {
             root_hash,
             proof_len,
-            proof_data,
-            hashes,
-        }: Self::Targets,
+            ref proof_data,
+            ref hashes,
+        }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
         // Setup constraints.
@@ -227,7 +227,7 @@ pub mod tests {
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = StorageProofTargets::new(&mut builder);
-        StorageProof::circuit(targets.clone(), &mut builder);
+        StorageProof::circuit(&targets, &mut builder);
 
         storage_proof
             .fill_targets(&mut pw, targets, inputs)

@@ -102,7 +102,7 @@ impl CircuitFragment for Nullifier {
     /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
     /// extrinsic_index + secret))`
     fn circuit(
-        Self::Targets { hash, preimage }: Self::Targets,
+        &Self::Targets { hash, ref preimage }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
@@ -167,7 +167,7 @@ pub mod tests {
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = NullifierTargets::new(&mut builder);
-        Nullifier::circuit(targets.clone(), &mut builder);
+        Nullifier::circuit(&targets, &mut builder);
 
         nullifier.fill_targets(&mut pw, targets, inputs).unwrap();
         build_and_prove_test(builder, pw)

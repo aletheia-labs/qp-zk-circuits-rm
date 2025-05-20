@@ -73,7 +73,7 @@ impl CircuitFragment for ExitAccount {
     type Targets = ExitAccountTargets;
 
     /// Builds a dummy circuit to include the exit account as a public input.
-    fn circuit(Self::Targets { address: _ }: Self::Targets, _builder: &mut CircuitBuilder<F, D>) {}
+    fn circuit(Self::Targets { address: _ }: &Self::Targets, _builder: &mut CircuitBuilder<F, D>) {}
 
     fn fill_targets(
         &self,
@@ -99,7 +99,7 @@ mod tests {
     fn run_test(exit_account: &ExitAccount) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = ExitAccountTargets::new(&mut builder);
-        ExitAccount::circuit(targets, &mut builder);
+        ExitAccount::circuit(&targets, &mut builder);
 
         exit_account.fill_targets(&mut pw, targets, ()).unwrap();
         build_and_prove_test(builder, pw)

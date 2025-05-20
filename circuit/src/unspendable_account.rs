@@ -106,10 +106,10 @@ impl CircuitFragment for UnspendableAccount {
 
     /// Builds a circuit that asserts that the `unspendable_account` was generated from `H(H(salt+secret))`.
     fn circuit(
-        Self::Targets {
+        &Self::Targets {
             account_id,
-            preimage,
-        }: Self::Targets,
+            ref preimage,
+        }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
@@ -195,7 +195,7 @@ pub mod tests {
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = UnspendableAccountTargets::new(&mut builder);
-        UnspendableAccount::circuit(targets.clone(), &mut builder);
+        UnspendableAccount::circuit(&targets, &mut builder);
 
         unspendable_account
             .fill_targets(&mut pw, targets, inputs)

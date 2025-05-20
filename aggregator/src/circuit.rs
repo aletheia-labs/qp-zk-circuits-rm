@@ -80,12 +80,12 @@ impl CircuitFragment for WormholeProofAggregator {
     type Targets = WormholeProofAggregatorTargets;
 
     fn circuit(
-        Self::Targets {
-            verifier_data,
-            proofs,
+        &Self::Targets {
+            ref verifier_data,
+            ref proofs,
             num_proofs,
-            circuit_data,
-        }: Self::Targets,
+            ref circuit_data,
+        }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
         // Verify each aggregated proof separately.
@@ -96,8 +96,8 @@ impl CircuitFragment for WormholeProofAggregator {
                 .conditionally_verify_proof_or_dummy::<C>(
                     is_proof,
                     proof,
-                    &verifier_data,
-                    &circuit_data,
+                    verifier_data,
+                    circuit_data,
                 )
                 .unwrap();
         }
@@ -140,7 +140,7 @@ mod tests {
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = WormholeProofAggregatorTargets::new(&mut builder);
-        WormholeProofAggregator::circuit(targets.clone(), &mut builder);
+        WormholeProofAggregator::circuit(&targets, &mut builder);
 
         let aggregator = WormholeProofAggregator::new();
         aggregator.fill_targets(&mut pw, targets, inputs).unwrap();

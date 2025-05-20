@@ -85,11 +85,11 @@ impl CircuitFragment for Amounts {
 
     /// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
     fn circuit(
-        Self::Targets {
+        &Self::Targets {
             funding_tx_amount,
             exit_amount,
             fee_amount,
-        }: Self::Targets,
+        }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
         let sum = builder.add(exit_amount, fee_amount);
@@ -121,7 +121,7 @@ mod tests {
     fn run_test(amounts: &Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
         let targets = AmountsTargets::new(&mut builder);
-        Amounts::circuit(targets, &mut builder);
+        Amounts::circuit(&targets, &mut builder);
 
         amounts.fill_targets(&mut pw, targets, ()).unwrap();
         build_and_prove_test(builder, pw)

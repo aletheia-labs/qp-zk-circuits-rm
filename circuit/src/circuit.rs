@@ -29,7 +29,7 @@ pub trait CircuitFragment {
     type Targets;
 
     /// Builds a circuit with the operating wires being provided by `Self::Targets`.
-    fn circuit(targets: Self::Targets, builder: &mut CircuitBuilder<F, D>);
+    fn circuit(targets: &Self::Targets, builder: &mut CircuitBuilder<F, D>);
 
     /// Fills the targets in the partial witness with the provided inputs.
     fn fill_targets(
@@ -105,16 +105,11 @@ impl Default for WormholeCircuit {
         let targets = CircuitTargets::new(&mut builder);
 
         // Setup circuits.
-        {
-            // Clone targets so we can pass them to the circuits but keep ownership within
-            // `WormholeCircuit`.
-            let targets = targets.clone();
-            Amounts::circuit(targets.amounts, &mut builder);
-            Nullifier::circuit(targets.nullifier, &mut builder);
-            UnspendableAccount::circuit(targets.unspendable_account, &mut builder);
-            StorageProof::circuit(targets.storage_proof, &mut builder);
-            ExitAccount::circuit(targets.exit_account, &mut builder);
-        }
+        Amounts::circuit(&targets.amounts, &mut builder);
+        Nullifier::circuit(&targets.nullifier, &mut builder);
+        UnspendableAccount::circuit(&targets.unspendable_account, &mut builder);
+        StorageProof::circuit(&targets.storage_proof, &mut builder);
+        ExitAccount::circuit(&targets.exit_account, &mut builder);
 
         Self { builder, targets }
     }
