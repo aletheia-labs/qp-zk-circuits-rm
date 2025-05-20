@@ -234,7 +234,10 @@ pub mod tests {
     #[test]
     #[should_panic(expected = "set twice with different values")]
     fn invalid_root_hash_fails() {
-        let proof = StorageProof::default();
+        let proof = StorageProof {
+            root_hash: [0u8; 32],
+            ..Default::default()
+        };
         run_test(&proof).unwrap();
     }
 
