@@ -25,7 +25,11 @@ pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
 
 pub trait CircuitFragment {
+    /// Private inputs to the circuit. These are not stored within the circuit structs themselves
+    /// and thus needs to be supplied via this type.
     type PrivateInputs;
+    /// The targets that the circuit operates on. These are constrained in the circuit definition
+    /// and filled with [`Self::fill_targets`].
     type Targets;
 
     /// Builds a circuit with the operating wires being provided by `Self::Targets`.
