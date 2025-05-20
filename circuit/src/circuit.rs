@@ -1,7 +1,10 @@
 //! Wormhole Circuit.
 //!
 //! This module defines the zero-knowledge circuit for the Wormhole protocol.
+use std::ops::Deref;
+
 use crate::amounts::{Amounts, AmountsTargets};
+use crate::codec::{ByteCodec, FieldElementCodec};
 use crate::exit_account::{ExitAccount, ExitAccountTargets};
 use crate::nullifier::{Nullifier, NullifierTargets};
 use crate::storage_proof::{StorageProof, StorageProofTargets};
@@ -20,16 +23,58 @@ use plonky2::{
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
-pub type Digest = [F; 4];
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
 
+pub type Digest = [F; 4];
+
+// TODO: Create `utils.rs`.
+pub const BYTES_PER_FELT: usize = 8;
+pub const HASH_NUM_FELTS: usize = 4;
+
+/// A hash that stores the underlying data as field elments.
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub struct FieldHash(pub Digest);
+
+impl Deref for FieldHash {
+    type Target = Digest;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Digest> for FieldHash {
+    fn from(digest: Digest) -> Self {
+        Self(digest)
+    }
+}
+
+impl ByteCodec<{ HASH_NUM_FELTS * BYTES_PER_FELT }> for FieldHash {
+    fn to_bytes(&self) -> Vec<u8> {
+        field_elements_to_bytes(&self.0)
+    }
+
+    fn from_bytes(bytes: [u8; HASH_NUM_FELTS * BYTES_PER_FELT]) -> Self {
+        // TODO: look at this, can it be better? no unwrapping?
+        let felts = slice_to_field_elements(&bytes).try_into().unwrap();
+        Self(felts)
+    }
+}
+
+impl FieldElementCodec<4> for FieldHash {
+    fn to_field_elements(&self) -> Vec<F> {
+        self.0.to_vec()
+    }
+
+    fn from_field_elements(elements: [F; 4]) -> Self {
+        Self(elements)
+    }
+}
+
 pub trait CircuitFragment {
-    /// Private inputs to the circuit. These are not stored within the circuit structs themselves
-    /// and thus needs to be supplied via this type.
-    type PrivateInputs;
     /// The targets that the circuit operates on. These are constrained in the circuit definition
-    /// and filled with [`Self::fill_targets`].
+    /// and filled with [`Self::fill_targets]`.
     type Targets;
 
     /// Builds a circuit with the operating wires being provided by `Self::Targets`.
@@ -40,7 +85,6 @@ pub trait CircuitFragment {
         &self,
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
-        inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()>;
 }
 
@@ -164,5 +208,29 @@ pub mod tests {
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let data = builder.build::<C>();
         data.prove(pw)
+    }
+
+    #[test]
+    fn field_hash_codec() {
+        let nullifier = FieldHash([
+            F::from_noncanonical_u64(1),
+            F::from_noncanonical_u64(2),
+            F::from_noncanonical_u64(3),
+            F::from_noncanonical_u64(4),
+        ]);
+
+        // Encode the account as field elements and compare.
+        let field_elements = nullifier.to_field_elements();
+        assert_eq!(field_elements.len(), 4);
+        assert_eq!(field_elements[0], F::from_noncanonical_u64(1));
+        assert_eq!(field_elements[1], F::from_noncanonical_u64(2));
+        assert_eq!(field_elements[2], F::from_noncanonical_u64(3));
+        assert_eq!(field_elements[3], F::from_noncanonical_u64(4));
+
+        let field_elements_array = field_elements.try_into().unwrap();
+
+        // Decode the field elements back into an UnspendableAccount
+        let recovered_nullifier = FieldHash::from_field_elements(field_elements_array);
+        assert_eq!(nullifier, recovered_nullifier);
     }
 }

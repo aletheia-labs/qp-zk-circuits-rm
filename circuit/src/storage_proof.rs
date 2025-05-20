@@ -87,7 +87,6 @@ impl From<&CircuitInputs> for StorageProof {
 }
 
 impl CircuitFragment for StorageProof {
-    type PrivateInputs = ();
     type Targets = StorageProofTargets;
 
     fn circuit(
@@ -125,7 +124,6 @@ impl CircuitFragment for StorageProof {
         &self,
         pw: &mut plonky2::iop::witness::PartialWitness<F>,
         targets: Self::Targets,
-        _inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         const EMPTY_PROOF_NODE: [F; PROOF_NODE_MAX_SIZE_F] = [F::ZERO; PROOF_NODE_MAX_SIZE_F];
 
@@ -221,7 +219,7 @@ pub mod tests {
         let targets = StorageProofTargets::new(&mut builder);
         StorageProof::circuit(&targets, &mut builder);
 
-        storage_proof.fill_targets(&mut pw, targets, ()).unwrap();
+        storage_proof.fill_targets(&mut pw, targets).unwrap();
         build_and_prove_test(builder, pw)
     }
 
