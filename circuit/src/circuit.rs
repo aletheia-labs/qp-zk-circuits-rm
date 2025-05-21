@@ -1,18 +1,14 @@
 //! Wormhole Circuit.
 //!
 //! This module defines the zero-knowledge circuit for the Wormhole protocol.
-use std::ops::Deref;
-
 use crate::amounts::{Amounts, AmountsTargets};
-use crate::codec::{ByteCodec, FieldElementCodec};
 use crate::exit_account::{ExitAccount, ExitAccountTargets};
 use crate::nullifier::{Nullifier, NullifierTargets};
 use crate::storage_proof::{StorageProof, StorageProofTargets};
 use crate::unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
-use plonky2::field::types::PrimeField64;
+use plonky2::field::goldilocks_field::GoldilocksField;
 use plonky2::plonk::circuit_data::CircuitData;
 use plonky2::{
-    field::{goldilocks_field::GoldilocksField, types::Field},
     iop::witness::PartialWitness,
     plonk::{
         circuit_builder::CircuitBuilder,
@@ -25,52 +21,6 @@ use plonky2::{
 pub const D: usize = 2; // D=2 provides 100-bits of security
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
-
-pub type Digest = [F; 4];
-
-// TODO: Create `utils.rs`.
-pub const BYTES_PER_FELT: usize = 8;
-pub const HASH_NUM_FELTS: usize = 4;
-
-/// A hash that stores the underlying data as field elments.
-#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
-pub struct FieldHash(pub Digest);
-
-impl Deref for FieldHash {
-    type Target = Digest;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl From<Digest> for FieldHash {
-    fn from(digest: Digest) -> Self {
-        Self(digest)
-    }
-}
-
-impl ByteCodec<{ HASH_NUM_FELTS * BYTES_PER_FELT }> for FieldHash {
-    fn to_bytes(&self) -> Vec<u8> {
-        field_elements_to_bytes(&self.0)
-    }
-
-    fn from_bytes(bytes: [u8; HASH_NUM_FELTS * BYTES_PER_FELT]) -> Self {
-        // TODO: look at this, can it be better? no unwrapping?
-        let felts = slice_to_field_elements(&bytes).try_into().unwrap();
-        Self(felts)
-    }
-}
-
-impl FieldElementCodec<4> for FieldHash {
-    fn to_field_elements(&self) -> Vec<F> {
-        self.0.to_vec()
-    }
-
-    fn from_field_elements(elements: [F; 4]) -> Self {
-        Self(elements)
-    }
-}
 
 pub trait CircuitFragment {
     /// The targets that the circuit operates on. These are constrained in the circuit definition
@@ -86,36 +36,6 @@ pub trait CircuitFragment {
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
     ) -> anyhow::Result<()>;
-}
-
-/// Converts a given slice into its field element representation.
-pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
-    const BYTES_PER_ELEMENT: usize = 8;
-
-    let mut field_elements: Vec<F> = Vec::new();
-    for chunk in input.chunks(BYTES_PER_ELEMENT) {
-        let mut bytes = [0u8; 8];
-        bytes[..chunk.len()].copy_from_slice(chunk);
-        // Convert the chunk to a field element.
-        let value = u64::from_le_bytes(bytes);
-        let field_element = F::from_noncanonical_u64(value);
-        field_elements.push(field_element);
-    }
-
-    field_elements
-}
-
-/// Converts a given field element slice into its byte representation.
-pub fn field_elements_to_bytes(input: &[F]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = Vec::new();
-
-    for field_element in input {
-        let value = field_element.to_noncanonical_u64();
-        let value_bytes = value.to_le_bytes();
-        bytes.extend_from_slice(&value_bytes);
-    }
-
-    bytes
 }
 
 #[derive(Debug, Clone)]
@@ -212,6 +132,9 @@ pub mod tests {
 
     #[test]
     fn field_hash_codec() {
+        use crate::{codec::FieldElementCodec, util::FieldHash};
+        use plonky2::field::types::Field;
+
         let nullifier = FieldHash([
             F::from_noncanonical_u64(1),
             F::from_noncanonical_u64(2),

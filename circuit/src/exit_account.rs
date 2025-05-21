@@ -1,6 +1,8 @@
-use crate::circuit::{CircuitFragment, FieldHash, D, F, HASH_NUM_FELTS};
-use crate::codec::{ByteCodec, FieldElementCodec};
+use crate::circuit::{CircuitFragment, D};
+use crate::codec::ByteCodec;
 use crate::inputs::CircuitInputs;
+use crate::util::{FieldHash, HASH_NUM_FELTS};
+use crate::{circuit::F, codec::FieldElementCodec};
 use plonky2::{
     hash::hash_types::HashOutTarget,
     iop::witness::{PartialWitness, WitnessWrite},
@@ -23,7 +25,7 @@ impl From<&CircuitInputs> for ExitAccount {
     }
 }
 
-impl FieldElementCodec<HASH_NUM_FELTS> for ExitAccount {
+impl FieldElementCodec<{ HASH_NUM_FELTS }> for ExitAccount {
     fn to_field_elements(&self) -> Vec<F> {
         self.0.to_vec()
     }

@@ -7,8 +7,12 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::circuit::{slice_to_field_elements, CircuitFragment, FieldHash, D, F};
-use crate::{codec::ByteCodec, inputs::CircuitInputs};
+use crate::{
+    circuit::{CircuitFragment, D, F},
+    codec::ByteCodec,
+    inputs::CircuitInputs,
+    util::{slice_to_field_elements, FieldHash},
+};
 
 // FIXME: Adjust as needed.
 pub const PREIMAGE_NUM_TARGETS: usize = 5;

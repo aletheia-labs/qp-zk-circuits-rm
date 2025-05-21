@@ -7,10 +7,11 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::inputs::CircuitInputs;
 use crate::{
-    circuit::{slice_to_field_elements, CircuitFragment, FieldHash, D, F},
+    circuit::{CircuitFragment, D, F},
     codec::ByteCodec,
+    inputs::CircuitInputs,
+    util::{slice_to_field_elements, FieldHash},
 };
 
 // FIXME: Adjust as needed.
@@ -142,9 +143,12 @@ pub mod test_helpers {
 pub mod tests {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
-    use crate::circuit::{
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
-        C, HASH_NUM_FELTS,
+    use crate::{
+        circuit::{
+            tests::{build_and_prove_test, setup_test_builder_and_witness},
+            C,
+        },
+        util::HASH_NUM_FELTS,
     };
 
     use super::{

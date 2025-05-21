@@ -1,7 +1,10 @@
 use anyhow::bail;
 use plonky2::{field::types::PrimeField64, plonk::proof::ProofWithPublicInputs};
 
-use crate::circuit::{field_elements_to_bytes, C, D, F};
+use crate::{
+    circuit::{C, D, F},
+    util::field_elements_to_bytes,
+};
 
 const PUBLIC_INPUTS_FELTS_LEN: usize = 19;
 
