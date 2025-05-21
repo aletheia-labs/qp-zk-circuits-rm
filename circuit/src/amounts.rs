@@ -62,11 +62,21 @@ impl From<&CircuitInputs> for Amounts {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct AmountsTargets {
     pub funding_tx_amount: Target,
     pub exit_amount: Target,
     pub fee_amount: Target,
+}
+
+impl AmountsTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        Self {
+            funding_tx_amount: builder.add_virtual_public_input(),
+            exit_amount: builder.add_virtual_public_input(),
+            fee_amount: builder.add_virtual_public_input(),
+        }
+    }
 }
 
 impl CircuitFragment for Amounts {
@@ -74,23 +84,16 @@ impl CircuitFragment for Amounts {
     type Targets = AmountsTargets;
 
     /// Builds a circuit that asserts `funding_tx_amount = exit_amount + fee_amount`.
-    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let funding_tx_amount = builder.add_virtual_target();
-        let exit_amount = builder.add_virtual_target();
-        let fee_amount = builder.add_virtual_target();
-
-        builder.register_public_input(funding_tx_amount);
-        builder.register_public_input(exit_amount);
-        builder.register_public_input(fee_amount);
-
-        let sum = builder.add(exit_amount, fee_amount);
-        builder.connect(sum, funding_tx_amount);
-
-        AmountsTargets {
+    fn circuit(
+        &Self::Targets {
             funding_tx_amount,
             exit_amount,
             fee_amount,
-        }
+        }: &Self::Targets,
+        builder: &mut CircuitBuilder<F, D>,
+    ) {
+        let sum = builder.add(exit_amount, fee_amount);
+        builder.connect(sum, funding_tx_amount);
     }
 
     fn fill_targets(
@@ -117,7 +120,8 @@ mod tests {
 
     fn run_test(amounts: &Amounts) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = Amounts::circuit(&mut builder);
+        let targets = AmountsTargets::new(&mut builder);
+        Amounts::circuit(&targets, &mut builder);
 
         amounts.fill_targets(&mut pw, targets, ()).unwrap();
         build_and_prove_test(builder, pw)

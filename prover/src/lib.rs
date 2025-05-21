@@ -35,7 +35,7 @@ use wormhole_circuit::{
     exit_account::ExitAccount,
     inputs::CircuitInputs,
     nullifier::{Nullifier, NullifierInputs},
-    storage_proof::{StorageProof, StorageProofInputs},
+    storage_proof::StorageProof,
     unspendable_account::{UnspendableAccount, UnspendableAccountInputs},
 };
 
@@ -99,11 +99,7 @@ impl WormholeProver {
             targets.unspendable_account,
             unspendable_account_inputs,
         )?;
-        storage_proof.fill_targets(
-            &mut self.partial_witness,
-            targets.storage_proof,
-            StorageProofInputs::new(circuit_inputs.public.root_hash),
-        )?;
+        storage_proof.fill_targets(&mut self.partial_witness, targets.storage_proof, ())?;
         exit_account.fill_targets(&mut self.partial_witness, targets.exit_account, ())?;
 
         Ok(self)

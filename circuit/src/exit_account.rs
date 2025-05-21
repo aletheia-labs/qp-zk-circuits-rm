@@ -60,15 +60,20 @@ pub struct ExitAccountTargets {
     pub address: HashOutTarget,
 }
 
+impl ExitAccountTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        Self {
+            address: builder.add_virtual_hash_public_input(),
+        }
+    }
+}
+
 impl CircuitFragment for ExitAccount {
     type PrivateInputs = ();
     type Targets = ExitAccountTargets;
 
     /// Builds a dummy circuit to include the exit account as a public input.
-    fn circuit(builder: &mut CircuitBuilder<F, D>) -> Self::Targets {
-        let address = builder.add_virtual_hash_public_input();
-        ExitAccountTargets { address }
-    }
+    fn circuit(Self::Targets { address: _ }: &Self::Targets, _builder: &mut CircuitBuilder<F, D>) {}
 
     fn fill_targets(
         &self,
@@ -93,7 +98,8 @@ mod tests {
 
     fn run_test(exit_account: &ExitAccount) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = ExitAccount::circuit(&mut builder);
+        let targets = ExitAccountTargets::new(&mut builder);
+        ExitAccount::circuit(&targets, &mut builder);
 
         exit_account.fill_targets(&mut pw, targets, ()).unwrap();
         build_and_prove_test(builder, pw)

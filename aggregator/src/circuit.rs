@@ -5,7 +5,8 @@ use plonky2::{
         witness::{PartialWitness, WitnessWrite},
     },
     plonk::{
-        circuit_data::VerifierCircuitTarget,
+        circuit_builder::CircuitBuilder,
+        circuit_data::{CommonCircuitData, VerifierCircuitTarget},
         proof::{ProofWithPublicInputs, ProofWithPublicInputsTarget},
     },
 };
@@ -17,10 +18,38 @@ use wormhole_verifier::WormholeVerifier;
 
 use crate::MAX_NUM_PROOFS_TO_AGGREGATE;
 
+#[derive(Debug, Clone)]
 pub struct WormholeProofAggregatorTargets {
     verifier_data: VerifierCircuitTarget,
     proofs: [ProofWithPublicInputsTarget<D>; MAX_NUM_PROOFS_TO_AGGREGATE],
     num_proofs: Target,
+    // HACK: This allows us to only create `circuit_data` once.
+    circuit_data: CommonCircuitData<F, D>,
+}
+
+impl WormholeProofAggregatorTargets {
+    pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        let circuit_data = WormholeVerifier::new().circuit_data.common;
+        let verifier_data =
+            builder.add_virtual_verifier_data(circuit_data.fri_params.config.cap_height);
+
+        // Setup targets for proofs.
+        let num_proofs = builder.add_virtual_target();
+        let mut proofs = Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE);
+        for _ in 0..MAX_NUM_PROOFS_TO_AGGREGATE {
+            proofs.push(builder.add_virtual_proof_with_pis(&circuit_data));
+        }
+
+        let proofs: [ProofWithPublicInputsTarget<D>; MAX_NUM_PROOFS_TO_AGGREGATE] =
+            std::array::from_fn(|_| builder.add_virtual_proof_with_pis(&circuit_data));
+
+        Self {
+            verifier_data,
+            proofs,
+            num_proofs,
+            circuit_data,
+        }
+    }
 }
 
 pub struct WormholeProofAggregatorInputs {
@@ -51,22 +80,14 @@ impl CircuitFragment for WormholeProofAggregator {
     type Targets = WormholeProofAggregatorTargets;
 
     fn circuit(
-        builder: &mut plonky2::plonk::circuit_builder::CircuitBuilder<F, D>,
-    ) -> Self::Targets {
-        let circuit_data = WormholeVerifier::new().circuit_data;
-        let verifier_data =
-            builder.add_virtual_verifier_data(circuit_data.common.fri_params.config.cap_height);
-
-        // Setup targets for proofs.
-        let num_proofs = builder.add_virtual_target();
-        let mut proofs = Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE);
-        for _ in 0..MAX_NUM_PROOFS_TO_AGGREGATE {
-            proofs.push(builder.add_virtual_proof_with_pis(&circuit_data.common));
-        }
-
-        let proofs: [ProofWithPublicInputsTarget<D>; MAX_NUM_PROOFS_TO_AGGREGATE] =
-            std::array::from_fn(|_| builder.add_virtual_proof_with_pis(&circuit_data.common));
-
+        &Self::Targets {
+            ref verifier_data,
+            ref proofs,
+            num_proofs,
+            ref circuit_data,
+        }: &Self::Targets,
+        builder: &mut CircuitBuilder<F, D>,
+    ) {
         // Verify each aggregated proof separately.
         let n_log = (usize::BITS - (MAX_NUM_PROOFS_TO_AGGREGATE - 1).leading_zeros()) as usize;
         for (i, proof) in proofs.iter().enumerate() {
@@ -75,16 +96,10 @@ impl CircuitFragment for WormholeProofAggregator {
                 .conditionally_verify_proof_or_dummy::<C>(
                     is_proof,
                     proof,
-                    &verifier_data,
-                    &circuit_data.common,
+                    verifier_data,
+                    circuit_data,
                 )
                 .unwrap();
-        }
-
-        WormholeProofAggregatorTargets {
-            verifier_data,
-            proofs,
-            num_proofs,
         }
     }
 
@@ -124,7 +139,8 @@ mod tests {
         inputs: WormholeProofAggregatorInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness();
-        let targets = WormholeProofAggregator::circuit(&mut builder);
+        let targets = WormholeProofAggregatorTargets::new(&mut builder);
+        WormholeProofAggregator::circuit(&targets, &mut builder);
 
         let aggregator = WormholeProofAggregator::new();
         aggregator.fill_targets(&mut pw, targets, inputs).unwrap();
