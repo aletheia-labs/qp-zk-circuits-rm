@@ -29,7 +29,7 @@ impl Nullifier {
         Self { hash, preimage }
     }
 
-    /// Cosntructs a new [`Nullfierie`] from just the preimage.
+    /// Cosntructs a new [`Nullifier`] from just the preimage.
     pub fn from_preimage(preimage: &[u8]) -> Self {
         // First, convert the preimage to its representation as field elements.
         let preimage = slice_to_field_elements(preimage);

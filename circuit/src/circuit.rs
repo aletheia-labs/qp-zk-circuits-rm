@@ -24,7 +24,7 @@ pub type F = GoldilocksField;
 
 pub trait CircuitFragment {
     /// The targets that the circuit operates on. These are constrained in the circuit definition
-    /// and filled with [`Self::fill_targets]`.
+    /// and filled with [`Self::fill_targets`].
     type Targets;
 
     /// Builds a circuit with the operating wires being provided by `Self::Targets`.
