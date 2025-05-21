@@ -39,8 +39,7 @@ impl ByteCodec<{ HASH_NUM_FELTS * BYTES_PER_FELT }> for FieldHash {
     }
 
     fn from_bytes(bytes: [u8; HASH_NUM_FELTS * BYTES_PER_FELT]) -> Self {
-        // TODO: look at this, can it be better? no unwrapping?
-        let felts = slice_to_field_elements(&bytes).try_into().unwrap();
+        let felts = array_to_field_elements(&bytes);
         Self(felts)
     }
 }
@@ -68,6 +67,26 @@ pub fn slice_to_field_elements(input: &[u8]) -> Vec<F> {
     }
 
     field_elements
+}
+
+/// Converts a fixed-size byte array into an array of field elements.
+pub fn array_to_field_elements<const NUM_FELTS: usize>(input: &[u8]) -> [F; NUM_FELTS] {
+    assert_eq!(
+        input.len(),
+        NUM_FELTS * BYTES_PER_FELT,
+        "Invalid input length"
+    );
+
+    let mut result = [F::ZERO; NUM_FELTS];
+    for (i, out) in result.iter_mut().enumerate().take(NUM_FELTS) {
+        let offset = i * BYTES_PER_FELT;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + BYTES_PER_FELT]);
+        let value = u64::from_le_bytes(bytes);
+        *out = F::from_noncanonical_u64(value);
+    }
+
+    result
 }
 
 /// Converts a given field element slice into its byte representation.
