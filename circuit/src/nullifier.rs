@@ -167,45 +167,22 @@ impl CircuitFragment for Nullifier {
     }
 }
 
-#[cfg(any(test, feature = "testing"))]
-pub mod test_helpers {
-    use super::{Nullifier, NullifierInputs};
-
-    pub const SECRET: &str = "9aa84f99ef2de22e3070394176868df41d6a148117a36132d010529e19b018b7";
-    pub const FUNDING_NONCE: u32 = 0;
-    pub const FUNDING_ACCOUNT: &[u8] = &[10u8; 32];
-    impl Default for Nullifier {
-        fn default() -> Self {
-            let secret = hex::decode(SECRET).unwrap();
-            Self::new(secret.as_slice(), FUNDING_NONCE, FUNDING_ACCOUNT)
-        }
-    }
-
-    impl Default for NullifierInputs {
-        fn default() -> Self {
-            let secret = hex::decode(SECRET).unwrap();
-            Self::new(&secret, FUNDING_NONCE, FUNDING_ACCOUNT)
-        }
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
+    use super::*;
     use crate::circuit::{
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
-    use crate::nullifier::test_helpers::{FUNDING_ACCOUNT, FUNDING_NONCE, SECRET};
-
-    use super::*;
+    use crate::test_helpers::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
 
     fn run_test(
         nullifier: &Nullifier,
         inputs: NullifierInputs,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
-        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let (mut builder, mut pw) = setup_test_builder_and_witness(false);
         let targets = NullifierTargets::new(&mut builder);
         Nullifier::circuit(&targets, &mut builder);
 
@@ -215,20 +192,24 @@ pub mod tests {
 
     #[test]
     fn build_and_verify_nullifier_proof() {
-        let nullifier = Nullifier::default();
-        let inputs = NullifierInputs::default();
+        let nullifier = Nullifier::test_inputs();
+        let inputs = NullifierInputs::test_inputs();
         run_test(&nullifier, inputs).unwrap();
     }
 
     #[test]
     fn invalid_secret_fails_proof() {
-        let valid_nullifier = Nullifier::default();
+        let valid_nullifier = Nullifier::test_inputs();
 
         // Flip the first byte of the preimage.
-        let mut invalid_bytes = hex::decode(SECRET).unwrap();
+        let mut invalid_bytes = hex::decode(DEFAULT_SECRET).unwrap();
         invalid_bytes[0] ^= 0xFF;
 
-        let bad_inputs = NullifierInputs::new(&invalid_bytes, FUNDING_NONCE, FUNDING_ACCOUNT);
+        let bad_inputs = NullifierInputs::new(
+            &invalid_bytes,
+            DEFAULT_FUNDING_NONCE,
+            DEFAULT_FUNDING_ACCOUNT,
+        );
 
         let res = run_test(&valid_nullifier, bad_inputs);
         assert!(res.is_err());
