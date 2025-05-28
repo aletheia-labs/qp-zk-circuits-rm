@@ -1,3 +1,10 @@
+use crate::utils::{bytes_to_felts, felts_to_bytes, string_to_felt, Digest};
+use crate::{
+    circuit::{CircuitFragment, D, F},
+    codec::FieldElementCodec,
+};
+use crate::{codec::ByteCodec};
+use plonky2::field::types::Field;
 use plonky2::{
     hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
     iop::{
@@ -7,61 +14,177 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
-use crate::{
-    circuit::{CircuitFragment, D, F},
-    codec::ByteCodec,
-    inputs::CircuitInputs,
-    util::{slice_to_field_elements, FieldHash},
-};
-
-// FIXME: Adjust as needed.
-pub const PREIMAGE_NUM_TARGETS: usize = 5;
+pub const NULLIFIER_SALT: &str = "~nullif~";
+pub const SECRET_NUM_TARGETS: usize = 4;
+pub const NONCE_NUM_TARGETS: usize = 1;
+pub const FUNDING_ACCOUNT_NUM_TARGETS: usize = 4;
+pub const PREIMAGE_NUM_TARGETS: usize =
+    SECRET_NUM_TARGETS + NONCE_NUM_TARGETS + FUNDING_ACCOUNT_NUM_TARGETS;
+const NULLIFIER_SIZE_BYTES: usize = 32 + 32 + 8 + 32;
+const NULLIFIER_SIZE_FELTS: usize = 4 + 4 + 1 + 4;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Nullifier {
     // FIXME: Should not be public, remove once hash is precomputed in tests.
-    pub hash: FieldHash,
-    preimage: Vec<F>,
+    pub hash: Digest,
+    secret: Vec<F>,
+    funding_nonce: F,
+    funding_account: Vec<F>
 }
+
 impl Nullifier {
-    pub fn new(hash: FieldHash, preimage: &[u8]) -> Self {
-        let preimage = slice_to_field_elements(preimage);
-        Self { hash, preimage }
-    }
+    pub fn new(secret: &[u8], funding_nonce: u32, funding_account: &[u8]) -> Self {
+        let mut preimage = Vec::new();
+        let salt = string_to_felt(NULLIFIER_SALT);
+        let secret = bytes_to_felts(secret);
+        let funding_nonce = F::from_canonical_u32(funding_nonce);
+        let funding_account = bytes_to_felts(funding_account);
+        preimage.push(salt);
+        preimage.extend(secret.clone());
+        preimage.push(funding_nonce);
+        preimage.extend(funding_account.clone());
 
-    /// Cosntructs a new [`Nullifier`] from just the preimage.
-    pub fn from_preimage(preimage: &[u8]) -> Self {
-        // First, convert the preimage to its representation as field elements.
-        let preimage = slice_to_field_elements(preimage);
-
-        // Hash twice to get the nullifier.
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
         let outer_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
-        let hash = FieldHash(outer_hash);
+        let hash = Digest::from(outer_hash);
 
-        Self { hash, preimage }
+        Self { hash, secret, funding_nonce, funding_account }
     }
 }
 
-impl From<&CircuitInputs> for Nullifier {
-    fn from(inputs: &CircuitInputs) -> Self {
-        let hash = FieldHash::from_bytes(inputs.public.nullifier);
-        let preimage = &inputs.private.nullifier_preimage;
-        Self::new(hash, preimage)
+impl ByteCodec for Nullifier {
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(felts_to_bytes(&self.hash));
+        bytes.extend(felts_to_bytes(&self.secret));
+        bytes.extend(felts_to_bytes(&[self.funding_nonce]));
+        bytes.extend(felts_to_bytes(&self.funding_account));
+        bytes
+    }
+
+    fn from_bytes(slice: &[u8]) -> anyhow::Result<Self> {
+        let f_size = size_of::<F>(); // 8 bytes
+        let hash_size = 4 * f_size; // 4 field elements
+        let secret_size = 4 * f_size; // 4 field elements
+        let nonce_size = f_size; // 1 field element
+        let funding_account_size = 4 * f_size; // 4 field elements
+        let total_size = hash_size + secret_size + nonce_size + funding_account_size;
+
+        if slice.len() != total_size {
+            return Err(anyhow::anyhow!(
+                "Expected {} bytes for Nullifier, got: {}",
+                total_size,
+                slice.len()
+            ));
+        }
+
+        let mut offset = 0;
+        // Deserialize hash
+        let hash = bytes_to_felts(&slice[offset..offset + hash_size])
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to deserialize nullifier hash"))?;
+        offset += hash_size;
+
+        // Deserialize secret
+        let secret = bytes_to_felts(&slice[offset..offset + secret_size]);
+        if secret.len() != 4 {
+            return Err(anyhow::anyhow!("Expected 4 field elements for secret, got: {}", secret.len()));
+        }
+        offset += secret_size;
+
+        // Deserialize funding_nonce
+        let funding_nonce = bytes_to_felts(&slice[offset..offset + nonce_size])
+            .get(0)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Failed to deserialize funding_nonce"))?;
+        offset += nonce_size;
+
+        // Deserialize funding_account
+        let funding_account = bytes_to_felts(&slice[offset..offset + funding_account_size]);
+        if funding_account.len() != 4 {
+            return Err(anyhow::anyhow!(
+                "Expected 4 field elements for funding_account, got: {}",
+                funding_account.len()
+            ));
+        }
+
+        Ok(Self {
+            hash,
+            secret,
+            funding_nonce,
+            funding_account,
+        })
+    }
+}
+
+impl FieldElementCodec for Nullifier {
+    fn to_field_elements(&self) -> Vec<F> {
+        let mut elements = Vec::new();
+        elements.extend(self.hash.to_vec());
+        elements.extend(self.secret.clone());
+        elements.push(self.funding_nonce);
+        elements.extend(self.funding_account.clone());
+        elements
+    }
+
+    fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
+        let hash_size = 4;  // 32 bytes = 4 field elements
+        let secret_size = 4; // 32 bytes = 4 field elements
+        let nonce_size = 1; // 1 field element
+        let funding_account_size = 4; // 32 bytes = 4 field elements
+        let total_size = hash_size + secret_size + nonce_size + funding_account_size;
+
+        if elements.len() != total_size {
+            return Err(anyhow::anyhow!(
+                "Expected {} field elements for Nullifier, got: {}",
+                total_size,
+                elements.len()
+            ));
+        }
+
+        let mut offset = 0;
+        // Deserialize hash
+        let hash = elements[offset..offset + hash_size]
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to deserialize nullifier hash"))?;
+        offset += hash_size;
+
+        // Deserialize secret
+        let secret = elements[offset..offset + secret_size].to_vec();
+        offset += secret_size;
+
+        // Deserialize funding_nonce
+        let funding_nonce = elements[offset];
+        offset += nonce_size;
+
+        // Deserialize funding_account
+        let funding_account = elements[offset..offset + funding_account_size].to_vec();
+
+        Ok(Self {
+            hash,
+            secret,
+            funding_nonce,
+            funding_account,
+        })
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct NullifierTargets {
     hash: HashOutTarget,
-    preimage: Vec<Target>,
+    pub secret: Vec<Target>,
+    funding_nonce: Target,
+    pub funding_account: Vec<Target>,
 }
 
 impl NullifierTargets {
     pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
+        // TODO: reuse target from other fragment here
         Self {
             hash: builder.add_virtual_hash_public_input(),
-            preimage: builder.add_virtual_targets(PREIMAGE_NUM_TARGETS),
+            secret: builder.add_virtual_targets(SECRET_NUM_TARGETS),
+            funding_nonce: builder.add_virtual_target(),
+            funding_account: builder.add_virtual_targets(FUNDING_ACCOUNT_NUM_TARGETS),
         }
     }
 }
@@ -72,9 +195,21 @@ impl CircuitFragment for Nullifier {
     /// Builds a circuit that assert that nullifier was computed with `H(H(nullifier +
     /// extrinsic_index + secret))`
     fn circuit(
-        &Self::Targets { hash, ref preimage }: &Self::Targets,
+        &Self::Targets {
+            hash,
+            ref secret,
+            funding_nonce,
+            ref funding_account,
+        }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
+        let mut preimage = Vec::new();
+        let salt = builder.constant(string_to_felt(NULLIFIER_SALT));
+        preimage.push(salt);
+        preimage.extend(secret);
+        preimage.push(funding_nonce);
+        preimage.extend(funding_account);
+
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());
         let computed_hash =
@@ -89,26 +224,11 @@ impl CircuitFragment for Nullifier {
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
     ) -> anyhow::Result<()> {
-        let digest = *self.hash;
-        pw.set_hash_target(targets.hash, digest.into())?;
-        pw.set_target_arr(&targets.preimage, &self.preimage)?;
-
+        pw.set_hash_target(targets.hash, self.hash.into())?;
+        pw.set_target_arr(&targets.secret, &self.secret)?;
+        pw.set_target(targets.funding_nonce, self.funding_nonce)?;
+        pw.set_target_arr(&targets.funding_account, &self.funding_account)?;
         Ok(())
-    }
-}
-
-#[cfg(any(test, feature = "testing"))]
-pub mod test_helpers {
-    use super::Nullifier;
-
-    pub const PREIMAGE: &str =
-        "776f726d686f6c650908804f8983b91253f3b2e4d49b71afc8e2c707608d9ae456990fb21591037f";
-
-    impl Default for Nullifier {
-        fn default() -> Self {
-            let preimage = hex::decode(PREIMAGE).unwrap();
-            Self::from_preimage(&preimage)
-        }
     }
 }
 
@@ -116,46 +236,47 @@ pub mod test_helpers {
 pub mod tests {
     use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 
+    use super::*;
     use crate::circuit::{
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
-    use crate::nullifier::test_helpers::PREIMAGE;
-
-    use super::*;
+    use crate::test_helpers::{DEFAULT_SECRET};
 
     fn run_test(nullifier: &Nullifier) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
-        let (mut builder, mut pw) = setup_test_builder_and_witness();
+        let (mut builder, mut pw) = setup_test_builder_and_witness(false);
         let targets = NullifierTargets::new(&mut builder);
         Nullifier::circuit(&targets, &mut builder);
 
-        nullifier.fill_targets(&mut pw, targets).unwrap();
+        nullifier.fill_targets(&mut pw, targets)?;
         build_and_prove_test(builder, pw)
     }
 
     #[test]
-    fn build_and_verify_proof() {
-        let nullifier = Nullifier::default();
+    fn build_and_verify_nullifier_proof() {
+        let nullifier = Nullifier::test_inputs();
         run_test(&nullifier).unwrap();
     }
 
     #[test]
-    fn invalid_preimage_fails_proof() {
-        let mut nullifier = Nullifier::default();
+    fn invalid_secret_fails_proof() {
+        let mut valid_nullifier = Nullifier::test_inputs();
 
         // Flip the first byte of the preimage.
-        let mut invalid_bytes = hex::decode(PREIMAGE).unwrap();
+        let mut invalid_bytes = hex::decode(DEFAULT_SECRET).unwrap();
         invalid_bytes[0] ^= 0xFF;
-        nullifier.preimage = slice_to_field_elements(&invalid_bytes);
+        valid_nullifier.secret = bytes_to_felts(&invalid_bytes);
 
-        let res = run_test(&nullifier);
-        assert!(res.is_err(),);
+        let res = run_test(&valid_nullifier);
+        assert!(res.is_err());
     }
 
     #[test]
     fn all_zero_preimage_is_valid_and_hashes() {
         let preimage_bytes = vec![0u8; 64];
-        let nullifier = Nullifier::from_preimage(&preimage_bytes);
+        let nonce = 0;
+        let funder = [0u8; 32];
+        let nullifier = Nullifier::new(&preimage_bytes, nonce, &funder);
         assert!(!nullifier.hash.to_vec().iter().all(Field::is_zero));
     }
 }

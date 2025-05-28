@@ -9,13 +9,11 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 plonky2.workspace = true
-poseidon-resonance.workspace = true
-hex = "0.4.3"
+hex.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-rand.workspace = true
+rand = { workspace = true }
 
 [features]
 default = []
-testing = []

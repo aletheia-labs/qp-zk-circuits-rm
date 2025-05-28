@@ -14,10 +14,12 @@
 //! ```
 //! use wormhole_circuit::inputs::CircuitInputs;
 //! use wormhole_prover::WormholeProver;
+//! use plonky2::plonk::circuit_data::CircuitConfig;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! # let inputs = CircuitInputs::default();
-//! let prover = WormholeProver::new();
+//! # let inputs = CircuitInputs::test_inputs();
+//! let config = CircuitConfig::standard_recursion_zk_config();
+//! let prover = WormholeProver::new(config);
 //! let proof = prover.commit(&inputs)?.prove()?;
 //! # Ok(())
 //! # }
@@ -25,19 +27,19 @@
 use anyhow::bail;
 use plonky2::{
     iop::witness::PartialWitness,
-    plonk::{circuit_data::ProverCircuitData, proof::ProofWithPublicInputs},
+    plonk::{
+        circuit_data::{CircuitConfig, ProverCircuitData},
+        proof::ProofWithPublicInputs,
+    },
 };
 
 use wormhole_circuit::circuit::{WormholeCircuit, C, D, F};
+use wormhole_circuit::codec::ByteCodec;
 use wormhole_circuit::{
-    amounts::Amounts,
     circuit::{CircuitFragment, CircuitTargets},
-    exit_account::ExitAccount,
     inputs::CircuitInputs,
-    nullifier::Nullifier,
-    storage_proof::StorageProof,
-    unspendable_account::UnspendableAccount,
 };
+use wormhole_circuit::storage_proof::StorageProof;
 
 #[derive(Debug)]
 pub struct WormholeProver {
@@ -48,7 +50,7 @@ pub struct WormholeProver {
 
 impl Default for WormholeProver {
     fn default() -> Self {
-        let wormhole_circuit = WormholeCircuit::new();
+        let wormhole_circuit = WormholeCircuit::default();
         let partial_witness = PartialWitness::new();
 
         let targets = Some(wormhole_circuit.targets());
@@ -64,8 +66,18 @@ impl Default for WormholeProver {
 
 impl WormholeProver {
     /// Creates a new [`WormholeProver`].
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(config: CircuitConfig) -> Self {
+        let wormhole_circuit = WormholeCircuit::new(config);
+        let partial_witness = PartialWitness::new();
+
+        let targets = Some(wormhole_circuit.targets());
+        let circuit_data = wormhole_circuit.build_prover();
+
+        Self {
+            circuit_data,
+            partial_witness,
+            targets,
+        }
     }
 
     /// Commits the provided [`CircuitInputs`] to the circuit by filling relevant targets.
@@ -77,18 +89,13 @@ impl WormholeProver {
         let Some(targets) = self.targets.take() else {
             bail!("prover has already commited to inputs");
         };
-
-        let amounts = Amounts::from(circuit_inputs);
-        let nullifier = Nullifier::from(circuit_inputs);
-        let unspendable_account = UnspendableAccount::from(circuit_inputs);
         let storage_proof = StorageProof::from(circuit_inputs);
-        let exit_account = ExitAccount::from(circuit_inputs);
 
-        amounts.fill_targets(&mut self.partial_witness, targets.amounts)?;
-        nullifier.fill_targets(&mut self.partial_witness, targets.nullifier)?;
-        unspendable_account.fill_targets(&mut self.partial_witness, targets.unspendable_account)?;
+
+        circuit_inputs.public.nullifier.fill_targets(&mut self.partial_witness, targets.nullifier)?;
+        circuit_inputs.private.unspendable_account.fill_targets(&mut self.partial_witness, targets.unspendable_account)?;
         storage_proof.fill_targets(&mut self.partial_witness, targets.storage_proof)?;
-        exit_account.fill_targets(&mut self.partial_witness, targets.exit_account)?;
+        circuit_inputs.public.exit_account.fill_targets(&mut self.partial_witness, targets.exit_account)?;
 
         Ok(self)
     }
@@ -110,34 +117,34 @@ impl WormholeProver {
 #[cfg(test)]
 mod tests {
     use super::WormholeProver;
+    use plonky2::plonk::circuit_data::CircuitConfig;
     use wormhole_circuit::inputs::CircuitInputs;
 
+    const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
+
     #[test]
-    #[cfg(feature = "testing")]
     fn commit_and_prove() {
-        let prover = WormholeProver::new();
-        let inputs = CircuitInputs::default();
+        let prover = WormholeProver::new(CIRCUIT_CONFIG);
+        let inputs = CircuitInputs::test_inputs();
         prover.commit(&inputs).unwrap().prove().unwrap();
     }
 
     #[test]
     #[ignore = "debug"]
-    #[cfg(feature = "testing")]
     fn get_public_inputs() {
-        let prover = WormholeProver::new();
-        let inputs = CircuitInputs::default();
+        let prover = WormholeProver::new(CIRCUIT_CONFIG);
+        let inputs = CircuitInputs::test_inputs();
         let proof = prover.commit(&inputs).unwrap().prove().unwrap();
         let public_inputs = proof.public_inputs;
         println!("{:?}", public_inputs);
     }
 
     #[test]
-    #[cfg(feature = "testing")]
     fn proof_can_be_deserialized() {
         use wormhole_circuit::inputs::PublicCircuitInputs;
 
-        let prover = WormholeProver::new();
-        let inputs = CircuitInputs::default();
+        let prover = WormholeProver::new(CIRCUIT_CONFIG);
+        let inputs = CircuitInputs::test_inputs();
         let proof = prover.commit(&inputs).unwrap().prove().unwrap();
         let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
         println!("{:?}", public_inputs);

@@ -9,16 +9,13 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 plonky2.workspace = true
-poseidon-resonance.workspace = true
 wormhole-circuit = { path = "../circuit" }
 
 [features]
-testing = ["wormhole-circuit/testing"]
 
 [[bench]]
 name = "prover_bench"
 harness = false
-required-features = ["testing"]
 
 [dev-dependencies]
 criterion = { workspace = true }

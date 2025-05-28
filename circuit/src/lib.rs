@@ -1,10 +1,10 @@
-pub mod amounts;
 pub mod circuit;
 pub mod codec;
-pub mod exit_account;
 pub mod gadgets;
 pub mod inputs;
 pub mod nullifier;
 pub mod storage_proof;
+pub mod substrate_account;
+mod test_helpers;
 pub mod unspendable_account;
-pub mod util;
+pub mod utils;
