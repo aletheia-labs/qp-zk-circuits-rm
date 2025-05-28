@@ -32,7 +32,7 @@ impl UnspendableAccount {
         preimage.push(string_to_felt(UNSPENDABLE_SALT));
         preimage.extend(bytes_to_felts(secret));
 
-        if preimage.len() != 5 {
+        if preimage.len() != PREIMAGE_NUM_TARGETS {
             panic!("Expected secret to be 32 bytes (4 field elements), got {} field elements", preimage.len() - 1);
         }
 
@@ -182,9 +182,6 @@ impl CircuitFragment for UnspendableAccount {
     ) -> anyhow::Result<()> {
         // Unspendable account circuit values.
         pw.set_hash_target(targets.account_id, self.account_id.into())?;
-        for (i, &element) in self.preimage.iter().enumerate() {
-            pw.set_target(targets.secret[i], element)?;
-        }
         pw.set_target_arr(&targets.secret, &self.preimage)?;
 
         Ok(())
@@ -283,7 +280,7 @@ pub mod tests {
 
     #[test]
     fn all_zero_preimage_is_valid_and_hashes() {
-        let secret_bytes = vec![0u8; 64];
+        let secret_bytes = vec![0u8; 32];
         let account = UnspendableAccount::new(&secret_bytes);
         assert!(!account.account_id.to_vec().iter().all(Field::is_zero));
     }

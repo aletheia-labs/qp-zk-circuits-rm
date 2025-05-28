@@ -154,7 +154,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 3"
+            "Expected 4 field elements for SubstrateAccount, got: 3"
         );
     }
 
@@ -213,7 +213,7 @@ mod tests {
         assert!(recovered_account_result.is_err());
         assert_eq!(
             recovered_account_result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 2"
+            "Expected 4 field elements for SubstrateAccount, got: 2"
         );
 
         let long_elements = vec![
@@ -228,7 +228,7 @@ mod tests {
         assert!(recovered_account_result.is_err());
         assert_eq!(
             recovered_account_result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 5"
+            "Expected 4 field elements for SubstrateAccount, got: 5"
         );
     }
 
@@ -239,7 +239,7 @@ mod tests {
         assert!(recovered_account_result.is_err());
         assert_eq!(
             recovered_account_result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 0"
+            "Expected 4 field elements for SubstrateAccount, got: 0"
         );
     }
 
