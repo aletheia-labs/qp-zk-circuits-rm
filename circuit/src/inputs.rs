@@ -1,6 +1,6 @@
 use crate::circuit::{C, D, F};
 use crate::codec::FieldElementCodec;
-use crate::nullifier::{Nullifier};
+use crate::nullifier::Nullifier;
 use crate::substrate_account::SubstrateAccount;
 use crate::test_helpers::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
 use crate::unspendable_account::UnspendableAccount;
