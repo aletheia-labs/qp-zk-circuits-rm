@@ -14,11 +14,13 @@ use plonky2::{
         config::PoseidonGoldilocksConfig,
     },
 };
+use plonky2::iop::target::Target;
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
+pub const FELTS_PER_U128: usize = 2;
 
 pub trait CircuitFragment {
     /// The targets that the circuit operates on. These are constrained in the circuit definition
@@ -71,7 +73,7 @@ impl WormholeCircuit {
     pub fn new(config: CircuitConfig) -> Self {
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        // Setup targets.
+        // Setup targets
         let targets = CircuitTargets::new(&mut builder);
 
         // Setup circuits.

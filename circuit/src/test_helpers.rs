@@ -40,7 +40,7 @@ impl CircuitInputs {
 
 pub mod storage_proof {
     use crate::storage_proof::StorageProof;
-
+    pub const DEFAULT_FUNDING_AMOUNT: u128 = 1000;
     pub const DEFAULT_ROOT_HASH: &str =
         "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
     pub const DEFAULT_STORAGE_PROOF: [(&str, &str); 3] = [
@@ -60,7 +60,7 @@ pub mod storage_proof {
 
     impl StorageProof {
         pub fn test_inputs() -> Self {
-            StorageProof::new(&default_storage_proof(), default_root_hash())
+            StorageProof::new(&default_storage_proof(), default_root_hash(), 0)
         }
     }
 

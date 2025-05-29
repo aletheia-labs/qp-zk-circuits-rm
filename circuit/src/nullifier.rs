@@ -21,7 +21,7 @@ pub const FUNDING_ACCOUNT_NUM_TARGETS: usize = 4;
 pub const PREIMAGE_NUM_TARGETS: usize =
     SECRET_NUM_TARGETS + NONCE_NUM_TARGETS + FUNDING_ACCOUNT_NUM_TARGETS;
 const NULLIFIER_SIZE_BYTES: usize = 32 + 32 + 8 + 32;
-const NULLIFIER_SIZE_FELTS: usize = 4 + 4 + 1 + 4;
+pub const NULLIFIER_SIZE_FELTS: usize = 4 + 4 + 1 + 4;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Nullifier {

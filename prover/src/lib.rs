@@ -91,7 +91,6 @@ impl WormholeProver {
         };
         let storage_proof = StorageProof::from(circuit_inputs);
 
-
         circuit_inputs.public.nullifier.fill_targets(&mut self.partial_witness, targets.nullifier)?;
         circuit_inputs.private.unspendable_account.fill_targets(&mut self.partial_witness, targets.unspendable_account)?;
         storage_proof.fill_targets(&mut self.partial_witness, targets.storage_proof)?;

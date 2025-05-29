@@ -11,14 +11,15 @@ use plonky2::{
 use crate::circuit::{CircuitFragment, D, F};
 use crate::gadgets::is_const_less_than;
 use crate::inputs::CircuitInputs;
-use crate::utils::{ bytes_to_felts };
+use crate::utils::{bytes_to_felts, u128_to_felts};
 
 pub const MAX_PROOF_LEN: usize = 20;
 pub const PROOF_NODE_MAX_SIZE_F: usize = 73;
 pub const PROOF_NODE_MAX_SIZE_B: usize = 256;
-
+pub const FELTS_PER_AMOUNT: usize = 2;
 #[derive(Debug, Clone)]
 pub struct StorageProofTargets {
+    pub funding_amount: Vec<Target>,
     pub root_hash: HashOutTarget,
     pub proof_len: Target,
     pub proof_data: Vec<Vec<Target>>,
@@ -38,6 +39,7 @@ impl StorageProofTargets {
             .collect();
 
         Self {
+            funding_amount: builder.add_virtual_public_input_arr::<FELTS_PER_AMOUNT>().to_vec(),
             root_hash: builder.add_virtual_hash_public_input(),
             proof_len: builder.add_virtual_target(),
             proof_data,
@@ -48,6 +50,7 @@ impl StorageProofTargets {
 
 #[derive(Debug)]
 pub struct StorageProof {
+    funding_amount: Vec<F>,
     proof: Vec<Vec<F>>,
     hashes: Vec<Vec<F>>,
     root_hash: [u8; 32],
@@ -56,7 +59,7 @@ pub struct StorageProof {
 impl StorageProof {
     /// The input is a storage proof as a tuple where each part is split at the index where the child node's
     /// hash, if any, appears within this proof node; and a root hash.
-    pub fn new(proof: &[(Vec<u8>, Vec<u8>)], root_hash: [u8; 32]) -> Self {
+    pub fn new(proof: &[(Vec<u8>, Vec<u8>)], root_hash: [u8; 32], funding_amount: u128) -> Self {
         // First construct the proof and the hash array
         let mut constructed_proof = Vec::with_capacity(proof.len());
         let mut hashes = Vec::with_capacity(proof.len());
@@ -74,6 +77,7 @@ impl StorageProof {
         }
 
         StorageProof {
+            funding_amount: u128_to_felts(funding_amount),
             proof: constructed_proof,
             hashes,
             root_hash,
@@ -83,7 +87,7 @@ impl StorageProof {
 
 impl From<&CircuitInputs> for StorageProof {
     fn from(inputs: &CircuitInputs) -> Self {
-        Self::new(&inputs.private.storage_proof, inputs.public.root_hash)
+        Self::new(&inputs.private.storage_proof, inputs.public.root_hash, inputs.public.funding_amount)
     }
 }
 
@@ -96,6 +100,7 @@ impl CircuitFragment for StorageProof {
             proof_len,
             ref proof_data,
             ref hashes,
+            ref funding_amount,
         }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
@@ -147,7 +152,9 @@ impl CircuitFragment for StorageProof {
             let hash = self.hashes.get(i).unwrap_or(&empty_hash);
             pw.set_hash_target(targets.hashes[i], HashOut::from_partial(&hash[..4]))?;
         }
-
+        // TODO: just a placeholder until we complete leaf hash
+        pw.set_target(targets.funding_amount[0], F::ZERO)?;
+        pw.set_target(targets.funding_amount[1], F::ZERO)?;
         Ok(())
     }
 }
@@ -169,7 +176,7 @@ pub mod tests {
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
-    use crate::test_helpers::storage_proof::{default_root_hash, default_storage_proof};
+    use crate::test_helpers::storage_proof::{default_root_hash, default_storage_proof, DEFAULT_FUNDING_AMOUNT};
     use rand::Rng;
 
     fn run_test(storage_proof: &StorageProof) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
@@ -177,7 +184,7 @@ pub mod tests {
         let targets = StorageProofTargets::new(&mut builder);
         StorageProof::circuit(&targets, &mut builder);
 
-        storage_proof.fill_targets(&mut pw, targets).unwrap();
+        storage_proof.fill_targets(&mut pw, targets)?;
         build_and_prove_test(builder, pw)
     }
 
@@ -202,7 +209,7 @@ pub mod tests {
 
         // Flip the first byte in the first node hash.
         tampered_proof[0].1[0] ^= 0xFF;
-        let proof = StorageProof::new(&tampered_proof, default_root_hash());
+        let proof = StorageProof::new(&tampered_proof, default_root_hash(), DEFAULT_FUNDING_AMOUNT);
 
         run_test(&proof).unwrap();
     }
@@ -231,7 +238,7 @@ pub mod tests {
             tampered_proof[node_index].1[byte_index] ^= rng.random_range(1..=255);
 
             // Create the proof and inputs
-            let proof = StorageProof::new(&tampered_proof, default_root_hash());
+            let proof = StorageProof::new(&tampered_proof, default_root_hash(), DEFAULT_FUNDING_AMOUNT);
 
             // Catch panic from run_test
             let result = panic::catch_unwind(|| {

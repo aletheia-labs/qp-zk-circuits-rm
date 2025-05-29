@@ -14,23 +14,24 @@ use crate::{
     utils::Digest
 };
 use crate::{codec::ByteCodec};
-use crate::inputs::CircuitInputs;
 
+pub const SECRET_NUM_TARGETS: usize = 4;
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
 pub const UNSPENDABLE_SALT: &str = "wormhole";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnspendableAccount {
     account_id: Digest,
-    preimage: Vec<F>,
+    secret: Vec<F>,
 }
 
 impl UnspendableAccount {
     pub fn new(secret: &[u8]) -> Self {
         // First, convert the preimage to its representation as field elements.
         let mut preimage = Vec::new();
+        let secret_felts = bytes_to_felts(secret);
         preimage.push(string_to_felt(UNSPENDABLE_SALT));
-        preimage.extend(bytes_to_felts(secret));
+        preimage.extend(secret_felts.clone());
 
         if preimage.len() != PREIMAGE_NUM_TARGETS {
             panic!("Expected secret to be 32 bytes (4 field elements), got {} field elements", preimage.len() - 1);
@@ -38,12 +39,13 @@ impl UnspendableAccount {
 
         // Hash twice to get the account id.
         let inner_hash = PoseidonHash::hash_no_pad(&preimage).elements;
+        // println!("inner_hash: {:?}", hex::encode(felts_to_bytes(&inner_hash)));
         let outer_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
         let account_id = Digest::from(outer_hash);
 
         Self {
             account_id,
-            preimage,
+            secret: secret_felts,
         }
     }
 }
@@ -61,7 +63,7 @@ impl ByteCodec for UnspendableAccount {
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend(felts_to_bytes(&self.account_id));
-        bytes.extend(felts_to_bytes(&self.preimage));
+        bytes.extend(felts_to_bytes(&self.secret));
         bytes
     }
 
@@ -91,7 +93,7 @@ impl ByteCodec for UnspendableAccount {
 
         Ok(Self {
             account_id,
-            preimage,
+            secret: preimage,
         })
     }
 }
@@ -100,7 +102,7 @@ impl FieldElementCodec for UnspendableAccount {
     fn to_field_elements(&self) -> Vec<F> {
         let mut elements = Vec::new();
         elements.extend(self.account_id.to_vec());
-        elements.extend(self.preimage.clone());
+        elements.extend(self.secret.clone());
         elements
     }
 
@@ -130,7 +132,7 @@ impl FieldElementCodec for UnspendableAccount {
 
         Ok(Self {
             account_id,
-            preimage,
+            secret: preimage,
         })
     }
 }
@@ -144,8 +146,8 @@ pub struct UnspendableAccountTargets {
 impl UnspendableAccountTargets {
     pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
         Self {
-            account_id: builder.add_virtual_hash_public_input(),
-            secret: builder.add_virtual_targets(PREIMAGE_NUM_TARGETS),
+            account_id: builder.add_virtual_hash(),
+            secret: builder.add_virtual_targets(SECRET_NUM_TARGETS),
         }
     }
 }
@@ -182,7 +184,7 @@ impl CircuitFragment for UnspendableAccount {
     ) -> anyhow::Result<()> {
         // Unspendable account circuit values.
         pw.set_hash_target(targets.account_id, self.account_id.into())?;
-        pw.set_target_arr(&targets.secret, &self.preimage)?;
+        pw.set_target_arr(&targets.secret, &self.secret)?;
 
         Ok(())
     }
@@ -191,24 +193,25 @@ impl CircuitFragment for UnspendableAccount {
 pub mod test_helpers {
     use super::UnspendableAccount;
 
-    /// An array of secrets generated from the Resonance Node with `./resonance-node key resonance --scheme wormhole`.
-    pub const SECRETS: [&str; 5] = [
-        "cd94df2e3c38a87f3e429b62af022dbe4363143811219d80037e8798b2ec9229",
-        "8b680b2421968a0c1d3cff6f3408e9d780157ae725724a78c3bc0998d1ac8194",
-        "87f5fc11df0d12f332ccfeb92ddd8995e6c11709501a8b59c2aaf9eefee63ec1",
-        "ef69da4e3aa2a6f15b3a9eec5e481f17260ac812faf1e685e450713327c3ab1c",
-        "9aa84f99ef2de22e3070394176868df41d6a148117a36132d010529e19b018b7",
-    ];
-
     /// An array of addresses generated from the Resoncance Node with `./resonance-node key resonance --scheme wormhole`.
     #[allow(dead_code)]
     pub const ADDRESSES: [&str; 5] = [
-        "c7334fbc8d75054ba3dd33b97db841c1031075ab9a26485fffe46bb519ccf25e",
-        "f904e475a317a4f45541492d86ec79ef0b5f3ef3ff1a022db1c461f1ec7e623c",
-        "e6060566ae1301253936d754ef21be71a02b00d59a40e265f25318f2359f7b3d",
-        "49499c5d8a14b300b6ceb5459f31a7c2887b03dd5ebfef788abe067c7a84ab5f",
-        "39fe23f1e26aa62001144e6b3250b753f5aabb4b5ecd5a86b8c4a7302744597e",
+        "3af670a9aae5fa52ca14ab952a5d3dd80ffd97cf7fe4ec18febd6b6d48db9ff3",
+        "8ae7f6db2098e39ef1156d4b8722c7a393480ee1711331a07217c7a8dd3f7424",
+        "0cf7f0f8baf7a9ecca87a7496cc40d1b3e3be3bc773b84b079028f7ce689042a",
+        "f41d2fd64d2d0e8e64a89cfe7e3402a46e0a52f8d89a09895dfb2e711fad617b",
+        "4b7f14435f205b6d4449fde3132e80c35fcb059c83cc3e510f9b86061d247891",
     ];
+
+    /// An array of secrets generated from the Resonance Node with `./resonance-node key resonance --scheme wormhole`.
+    pub const SECRETS: [&str; 5] = [
+        "3d2aa1def85521eca8de239acd6e124ce7830cff45e1d74f8b794e01ea5c29a1",
+        "76d0c295490a8f7dd1047652cd91180bb54902c70c56a07df98dd03de5ff9280",
+        "dd71a193c7676e4d606fee0d58b15044369b52ec306446c454e37388506dc960",
+        "dda8f43788e46f64edef10b4aebfd1f17163d233afb54695a077bb68f0fe18ff",
+        "1ea115b053fbc1aa8c162af6c5af24bf7978fe65b2c174b378f30fc1fc9fe222",
+    ];
+
 
     impl Default for UnspendableAccount {
         fn default() -> Self {
@@ -255,6 +258,7 @@ pub mod tests {
         for (secret, address) in SECRETS.iter().zip(ADDRESSES) {
             let decoded_secret = hex::decode(secret).unwrap();
             let decoded_address = hex::decode(address).unwrap();
+            // println!("secret: {} address: {} decoded_secret: {:?} decoded_address {:?}", secret, address, hex::encode(decoded_secret.clone()), hex::encode(decoded_address.clone()));
             let unspendable_account = UnspendableAccount::new(&decoded_secret);
 
             let address = bytes_to_felts(&decoded_address);
