@@ -146,9 +146,11 @@ mod tests {
             // u128 -> Vec<F>
             let round_trip_felts = u128_to_felts(num);
             assert_eq!(
-                round_trip_felts.to_vec(), felts,
+                round_trip_felts.to_vec(),
+                felts,
                 "Round trip failed for input {:?}. Got {:?}",
-                felts, round_trip_felts
+                felts,
+                round_trip_felts
             );
         }
     }

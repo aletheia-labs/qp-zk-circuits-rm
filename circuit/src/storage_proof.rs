@@ -39,8 +39,7 @@ impl StorageProofTargets {
             .collect();
 
         Self {
-            funding_amount: builder
-                .add_virtual_public_input_arr::<FELTS_PER_AMOUNT>(),
+            funding_amount: builder.add_virtual_public_input_arr::<FELTS_PER_AMOUNT>(),
             root_hash: builder.add_virtual_hash_public_input(),
             proof_len: builder.add_virtual_target(),
             proof_data,
