@@ -35,11 +35,11 @@ use plonky2::{
 
 use wormhole_circuit::circuit::{WormholeCircuit, C, D, F};
 use wormhole_circuit::codec::ByteCodec;
+use wormhole_circuit::storage_proof::StorageProof;
 use wormhole_circuit::{
     circuit::{CircuitFragment, CircuitTargets},
     inputs::CircuitInputs,
 };
-use wormhole_circuit::storage_proof::StorageProof;
 
 #[derive(Debug)]
 pub struct WormholeProver {
@@ -91,10 +91,19 @@ impl WormholeProver {
         };
         let storage_proof = StorageProof::from(circuit_inputs);
 
-        circuit_inputs.public.nullifier.fill_targets(&mut self.partial_witness, targets.nullifier)?;
-        circuit_inputs.private.unspendable_account.fill_targets(&mut self.partial_witness, targets.unspendable_account)?;
+        circuit_inputs
+            .public
+            .nullifier
+            .fill_targets(&mut self.partial_witness, targets.nullifier)?;
+        circuit_inputs
+            .private
+            .unspendable_account
+            .fill_targets(&mut self.partial_witness, targets.unspendable_account)?;
         storage_proof.fill_targets(&mut self.partial_witness, targets.storage_proof)?;
-        circuit_inputs.public.exit_account.fill_targets(&mut self.partial_witness, targets.exit_account)?;
+        circuit_inputs
+            .public
+            .exit_account
+            .fill_targets(&mut self.partial_witness, targets.exit_account)?;
 
         Ok(self)
     }

@@ -7,13 +7,13 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
+use crate::codec::ByteCodec;
 use crate::utils::{bytes_to_felts, felts_to_bytes, string_to_felt};
 use crate::{
     circuit::{CircuitFragment, D, F},
     codec::FieldElementCodec,
-    utils::Digest
+    utils::Digest,
 };
-use crate::{codec::ByteCodec};
 
 pub const SECRET_NUM_TARGETS: usize = 4;
 pub const PREIMAGE_NUM_TARGETS: usize = 5;
@@ -34,7 +34,10 @@ impl UnspendableAccount {
         preimage.extend(secret_felts.clone());
 
         if preimage.len() != PREIMAGE_NUM_TARGETS {
-            panic!("Expected secret to be 32 bytes (4 field elements), got {} field elements", preimage.len() - 1);
+            panic!(
+                "Expected secret to be 32 bytes (4 field elements), got {} field elements",
+                preimage.len() - 1
+            );
         }
 
         // Hash twice to get the account id.
@@ -211,7 +214,6 @@ pub mod test_helpers {
         "dda8f43788e46f64edef10b4aebfd1f17163d233afb54695a077bb68f0fe18ff",
         "1ea115b053fbc1aa8c162af6c5af24bf7978fe65b2c174b378f30fc1fc9fe222",
     ];
-
 
     impl Default for UnspendableAccount {
         fn default() -> Self {

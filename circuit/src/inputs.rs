@@ -1,6 +1,4 @@
-use anyhow::bail;
-use plonky2::plonk::proof::ProofWithPublicInputs;
-use crate::circuit::{C, F, D};
+use crate::circuit::{C, D, F};
 use crate::codec::FieldElementCodec;
 use crate::nullifier::{Nullifier, NULLIFIER_SIZE_FELTS};
 use crate::substrate_account::SubstrateAccount;
@@ -8,6 +6,8 @@ use crate::test_helpers::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAUL
 use crate::unspendable_account::test_helpers::SECRETS;
 use crate::unspendable_account::UnspendableAccount;
 use crate::utils::{felts_to_bytes, felts_to_u128};
+use anyhow::bail;
+use plonky2::plonk::proof::ProofWithPublicInputs;
 
 /// The total size of the public inputs field element vector.
 const PUBLIC_INPUTS_FELTS_LEN: usize = 14;
@@ -48,7 +48,6 @@ pub struct PrivateCircuitInputs {
     pub unspendable_account: UnspendableAccount,
 }
 
-
 impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
     type Error = anyhow::Error;
 
@@ -60,8 +59,6 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
         /// StorageProof.funding_amount: 2 felts
         /// StorageProof.root_hash: 4 felts
         /// ExitAccount.address: 4 felts
-
-
         if public_inputs.len() != PUBLIC_INPUTS_FELTS_LEN {
             bail!(
                 "public inputs should contain: {} field elements, got: {}",
@@ -74,7 +71,11 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
         let mut idx1 = 4;
         // TODO: fix this
         // let nullifier = Nullifier::from_field_elements(&public_inputs[idx0..idx1])?;
-        let nullifier = Nullifier::new(DEFAULT_SECRET.as_ref(), DEFAULT_FUNDING_NONCE, DEFAULT_FUNDING_ACCOUNT);
+        let nullifier = Nullifier::new(
+            DEFAULT_SECRET.as_ref(),
+            DEFAULT_FUNDING_NONCE,
+            DEFAULT_FUNDING_ACCOUNT,
+        );
         idx0 = idx1;
         idx1 += 2;
         let funding_amount = felts_to_u128(public_inputs[idx0..idx1].to_vec());

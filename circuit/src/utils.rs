@@ -1,7 +1,7 @@
-use std::ops::Deref;
 use crate::circuit::F;
-use plonky2::field::types::{Field, PrimeField64};
 use crate::codec::{ByteCodec, FieldElementCodec};
+use plonky2::field::types::{Field, PrimeField64};
+use std::ops::Deref;
 
 pub fn u128_to_felts(num: u128) -> Vec<F> {
     let mut amount_felts: Vec<F> = Vec::with_capacity(2);
@@ -65,7 +65,6 @@ pub type Digest = [F; 4];
 pub const BYTES_PER_FELT: usize = 8;
 pub const HASH_NUM_FELTS: usize = 4;
 
-
 /// Converts a fixed-size byte array into an array of field elements.
 pub fn array_to_field_elements<const NUM_FELTS: usize>(input: &[u8]) -> [F; NUM_FELTS] {
     assert_eq!(
@@ -85,7 +84,6 @@ pub fn array_to_field_elements<const NUM_FELTS: usize>(input: &[u8]) -> [F; NUM_
 
     result
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use plonky2::recursion::dummy_circuit::{dummy_circuit, dummy_proof};
 use plonky2::{
     field::types::Field,
     iop::{
@@ -11,7 +12,6 @@ use plonky2::{
         proof::{ProofWithPublicInputs, ProofWithPublicInputsTarget},
     },
 };
-use plonky2::recursion::dummy_circuit::{dummy_circuit, dummy_proof};
 use wormhole_circuit::{
     circuit::{CircuitFragment, C, D, F},
     gadgets::is_const_less_than,
@@ -71,7 +71,9 @@ impl Default for WormholeProofAggregator {
         Self {
             inner_verifier,
             num_proofs: 10,
-            proofs: (0..10).map(|_| dummy_proof(&dummy_circuit, HashMap::new()).unwrap()).collect::<Vec<_>>()
+            proofs: (0..10)
+                .map(|_| dummy_proof(&dummy_circuit, HashMap::new()).unwrap())
+                .collect::<Vec<_>>(),
         }
     }
 }

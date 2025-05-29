@@ -5,16 +5,16 @@ use crate::nullifier::{Nullifier, NullifierTargets};
 use crate::storage_proof::{StorageProof, StorageProofTargets};
 use crate::substrate_account::{ExitAccountTargets, SubstrateAccount};
 use crate::unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
+use plonky2::iop::target::Target;
 use plonky2::{
     field::goldilocks_field::GoldilocksField,
     iop::witness::PartialWitness,
     plonk::{
         circuit_builder::CircuitBuilder,
-        circuit_data::{CircuitData, CircuitConfig, ProverCircuitData, VerifierCircuitData},
+        circuit_data::{CircuitConfig, CircuitData, ProverCircuitData, VerifierCircuitData},
         config::PoseidonGoldilocksConfig,
     },
 };
-use plonky2::iop::target::Target;
 
 // Plonky2 setup parameters.
 pub const D: usize = 2; // D=2 provides 100-bits of security
@@ -130,5 +130,4 @@ pub mod tests {
         let data = builder.build::<C>();
         data.prove(pw)
     }
-
 }

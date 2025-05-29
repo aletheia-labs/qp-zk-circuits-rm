@@ -80,7 +80,7 @@ pub mod storage_proof {
 }
 
 pub mod nullifier {
-    use crate::nullifier::{Nullifier};
+    use crate::nullifier::Nullifier;
 
     use super::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
 

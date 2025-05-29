@@ -39,7 +39,9 @@ impl StorageProofTargets {
             .collect();
 
         Self {
-            funding_amount: builder.add_virtual_public_input_arr::<FELTS_PER_AMOUNT>().to_vec(),
+            funding_amount: builder
+                .add_virtual_public_input_arr::<FELTS_PER_AMOUNT>()
+                .to_vec(),
             root_hash: builder.add_virtual_hash_public_input(),
             proof_len: builder.add_virtual_target(),
             proof_data,
@@ -87,7 +89,11 @@ impl StorageProof {
 
 impl From<&CircuitInputs> for StorageProof {
     fn from(inputs: &CircuitInputs) -> Self {
-        Self::new(&inputs.private.storage_proof, inputs.public.root_hash, inputs.public.funding_amount)
+        Self::new(
+            &inputs.private.storage_proof,
+            inputs.public.root_hash,
+            inputs.public.funding_amount,
+        )
     }
 }
 
@@ -176,7 +182,9 @@ pub mod tests {
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
-    use crate::test_helpers::storage_proof::{default_root_hash, default_storage_proof, DEFAULT_FUNDING_AMOUNT};
+    use crate::test_helpers::storage_proof::{
+        default_root_hash, default_storage_proof, DEFAULT_FUNDING_AMOUNT,
+    };
     use rand::Rng;
 
     fn run_test(storage_proof: &StorageProof) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
@@ -238,7 +246,8 @@ pub mod tests {
             tampered_proof[node_index].1[byte_index] ^= rng.random_range(1..=255);
 
             // Create the proof and inputs
-            let proof = StorageProof::new(&tampered_proof, default_root_hash(), DEFAULT_FUNDING_AMOUNT);
+            let proof =
+                StorageProof::new(&tampered_proof, default_root_hash(), DEFAULT_FUNDING_AMOUNT);
 
             // Catch panic from run_test
             let result = panic::catch_unwind(|| {

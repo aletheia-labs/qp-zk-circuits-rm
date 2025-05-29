@@ -1,9 +1,9 @@
+use crate::codec::ByteCodec;
 use crate::utils::{bytes_to_felts, felts_to_bytes, string_to_felt, Digest};
 use crate::{
     circuit::{CircuitFragment, D, F},
     codec::FieldElementCodec,
 };
-use crate::{codec::ByteCodec};
 use plonky2::field::types::Field;
 use plonky2::{
     hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
@@ -29,7 +29,7 @@ pub struct Nullifier {
     pub hash: Digest,
     secret: Vec<F>,
     funding_nonce: F,
-    funding_account: Vec<F>
+    funding_account: Vec<F>,
 }
 
 impl Nullifier {
@@ -48,7 +48,12 @@ impl Nullifier {
         let outer_hash = PoseidonHash::hash_no_pad(&inner_hash).elements;
         let hash = Digest::from(outer_hash);
 
-        Self { hash, secret, funding_nonce, funding_account }
+        Self {
+            hash,
+            secret,
+            funding_nonce,
+            funding_account,
+        }
     }
 }
 
@@ -88,7 +93,10 @@ impl ByteCodec for Nullifier {
         // Deserialize secret
         let secret = bytes_to_felts(&slice[offset..offset + secret_size]);
         if secret.len() != 4 {
-            return Err(anyhow::anyhow!("Expected 4 field elements for secret, got: {}", secret.len()));
+            return Err(anyhow::anyhow!(
+                "Expected 4 field elements for secret, got: {}",
+                secret.len()
+            ));
         }
         offset += secret_size;
 
@@ -128,7 +136,7 @@ impl FieldElementCodec for Nullifier {
     }
 
     fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
-        let hash_size = 4;  // 32 bytes = 4 field elements
+        let hash_size = 4; // 32 bytes = 4 field elements
         let secret_size = 4; // 32 bytes = 4 field elements
         let nonce_size = 1; // 1 field element
         let funding_account_size = 4; // 32 bytes = 4 field elements
@@ -241,7 +249,7 @@ pub mod tests {
         tests::{build_and_prove_test, setup_test_builder_and_witness},
         C,
     };
-    use crate::test_helpers::{DEFAULT_SECRET};
+    use crate::test_helpers::DEFAULT_SECRET;
 
     fn run_test(nullifier: &Nullifier) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness(false);
