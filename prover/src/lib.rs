@@ -34,7 +34,6 @@ use plonky2::{
 };
 
 use wormhole_circuit::circuit::{WormholeCircuit, C, D, F};
-use wormhole_circuit::codec::ByteCodec;
 use wormhole_circuit::storage_proof::StorageProof;
 use wormhole_circuit::{
     circuit::{CircuitFragment, CircuitTargets},

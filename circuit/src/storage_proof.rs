@@ -51,6 +51,7 @@ impl StorageProofTargets {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct StorageProof {
     funding_amount: Vec<F>,
     proof: Vec<Vec<F>>,
@@ -100,6 +101,7 @@ impl From<&CircuitInputs> for StorageProof {
 impl CircuitFragment for StorageProof {
     type Targets = StorageProofTargets;
 
+    #[allow(unused_variables)]
     fn circuit(
         &Self::Targets {
             root_hash,

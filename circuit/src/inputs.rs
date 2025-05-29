@@ -1,9 +1,8 @@
 use crate::circuit::{C, D, F};
 use crate::codec::FieldElementCodec;
-use crate::nullifier::{Nullifier, NULLIFIER_SIZE_FELTS};
+use crate::nullifier::{Nullifier};
 use crate::substrate_account::SubstrateAccount;
 use crate::test_helpers::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
-use crate::unspendable_account::test_helpers::SECRETS;
 use crate::unspendable_account::UnspendableAccount;
 use crate::utils::{felts_to_bytes, felts_to_u128};
 use anyhow::bail;
@@ -54,11 +53,11 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
     fn try_from(proof: ProofWithPublicInputs<F, C, D>) -> Result<Self, Self::Error> {
         let public_inputs = proof.public_inputs;
 
-        /// Public inputs are ordered as follows:
-        /// Nullifier.hash: 4 felts
-        /// StorageProof.funding_amount: 2 felts
-        /// StorageProof.root_hash: 4 felts
-        /// ExitAccount.address: 4 felts
+        // Public inputs are ordered as follows:
+        // Nullifier.hash: 4 felts
+        // StorageProof.funding_amount: 2 felts
+        // StorageProof.root_hash: 4 felts
+        // ExitAccount.address: 4 felts
         if public_inputs.len() != PUBLIC_INPUTS_FELTS_LEN {
             bail!(
                 "public inputs should contain: {} field elements, got: {}",
@@ -67,7 +66,7 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
             )
         }
 
-        let mut idx0 = 0;
+        let mut idx0: usize;
         let mut idx1 = 4;
         // TODO: fix this
         // let nullifier = Nullifier::from_field_elements(&public_inputs[idx0..idx1])?;

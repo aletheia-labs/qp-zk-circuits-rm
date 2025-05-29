@@ -1,7 +1,5 @@
 use crate::circuit::F;
-use crate::codec::{ByteCodec, FieldElementCodec};
 use plonky2::field::types::{Field, PrimeField64};
-use std::ops::Deref;
 
 pub fn u128_to_felts(num: u128) -> Vec<F> {
     let mut amount_felts: Vec<F> = Vec::with_capacity(2);

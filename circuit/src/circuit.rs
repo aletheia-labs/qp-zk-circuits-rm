@@ -5,7 +5,6 @@ use crate::nullifier::{Nullifier, NullifierTargets};
 use crate::storage_proof::{StorageProof, StorageProofTargets};
 use crate::substrate_account::{ExitAccountTargets, SubstrateAccount};
 use crate::unspendable_account::{UnspendableAccount, UnspendableAccountTargets};
-use plonky2::iop::target::Target;
 use plonky2::{
     field::goldilocks_field::GoldilocksField,
     iop::witness::PartialWitness,

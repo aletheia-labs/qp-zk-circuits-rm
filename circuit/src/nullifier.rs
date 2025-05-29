@@ -20,7 +20,6 @@ pub const NONCE_NUM_TARGETS: usize = 1;
 pub const FUNDING_ACCOUNT_NUM_TARGETS: usize = 4;
 pub const PREIMAGE_NUM_TARGETS: usize =
     SECRET_NUM_TARGETS + NONCE_NUM_TARGETS + FUNDING_ACCOUNT_NUM_TARGETS;
-const NULLIFIER_SIZE_BYTES: usize = 32 + 32 + 8 + 32;
 pub const NULLIFIER_SIZE_FELTS: usize = 4 + 4 + 1 + 4;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -102,7 +101,7 @@ impl ByteCodec for Nullifier {
 
         // Deserialize funding_nonce
         let funding_nonce = bytes_to_felts(&slice[offset..offset + nonce_size])
-            .get(0)
+            .first()
             .copied()
             .ok_or_else(|| anyhow::anyhow!("Failed to deserialize funding_nonce"))?;
         offset += nonce_size;

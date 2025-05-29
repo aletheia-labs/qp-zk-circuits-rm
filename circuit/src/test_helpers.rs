@@ -2,7 +2,6 @@ use storage_proof::{default_storage_proof, DEFAULT_ROOT_HASH};
 
 use crate::inputs::{CircuitInputs, PrivateCircuitInputs, PublicCircuitInputs};
 use crate::nullifier::Nullifier;
-use crate::storage_proof::StorageProof;
 use crate::substrate_account::SubstrateAccount;
 use crate::unspendable_account::UnspendableAccount;
 
@@ -40,6 +39,7 @@ impl CircuitInputs {
 
 pub mod storage_proof {
     use crate::storage_proof::StorageProof;
+    #[allow(dead_code)]
     pub const DEFAULT_FUNDING_AMOUNT: u128 = 1000;
     pub const DEFAULT_ROOT_HASH: &str =
         "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
