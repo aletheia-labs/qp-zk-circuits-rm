@@ -19,7 +19,7 @@ pub const PROOF_NODE_MAX_SIZE_B: usize = 256;
 pub const FELTS_PER_AMOUNT: usize = 2;
 #[derive(Debug, Clone)]
 pub struct StorageProofTargets {
-    pub funding_amount: Vec<Target>,
+    pub funding_amount: [Target; 2],
     pub root_hash: HashOutTarget,
     pub proof_len: Target,
     pub proof_data: Vec<Vec<Target>>,
@@ -40,8 +40,7 @@ impl StorageProofTargets {
 
         Self {
             funding_amount: builder
-                .add_virtual_public_input_arr::<FELTS_PER_AMOUNT>()
-                .to_vec(),
+                .add_virtual_public_input_arr::<FELTS_PER_AMOUNT>(),
             root_hash: builder.add_virtual_hash_public_input(),
             proof_len: builder.add_virtual_target(),
             proof_data,
