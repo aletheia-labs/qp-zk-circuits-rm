@@ -19,7 +19,6 @@ use plonky2::{
 pub const D: usize = 2; // D=2 provides 100-bits of security
 pub type C = PoseidonGoldilocksConfig;
 pub type F = GoldilocksField;
-pub const FELTS_PER_U128: usize = 2;
 
 pub trait CircuitFragment {
     /// The targets that the circuit operates on. These are constrained in the circuit definition

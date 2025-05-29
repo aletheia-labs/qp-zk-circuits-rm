@@ -10,7 +10,16 @@ use plonky2::plonk::proof::ProofWithPublicInputs;
 
 /// The total size of the public inputs field element vector.
 const PUBLIC_INPUTS_FELTS_LEN: usize = 14;
-
+#[allow(dead_code)]
+const NULLIFIER_START_INDEX: usize = 0;
+#[allow(dead_code)]
+const NULLIFIER_END_INDEX: usize = 4;
+const FUNDING_AMOUNT_START_INDEX: usize = 4;
+const FUNDING_AMOUNT_END_INDEX: usize = 6;
+const ROOT_HASH_START_INDEX: usize = 6;
+const ROOT_HASH_END_INDEX: usize = 10;
+const EXIT_ACCOUNT_START_INDEX: usize = 10;
+const EXIT_ACCOUNT_END_INDEX: usize = 14;
 /// Inputs required to commit to the wormhole circuit.
 #[derive(Debug)]
 pub struct CircuitInputs {
@@ -66,8 +75,6 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
             )
         }
 
-        let mut idx0: usize;
-        let mut idx1 = 4;
         // TODO: fix this
         // let nullifier = Nullifier::from_field_elements(&public_inputs[idx0..idx1])?;
         let nullifier = Nullifier::new(
@@ -75,18 +82,19 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
             DEFAULT_FUNDING_NONCE,
             DEFAULT_FUNDING_ACCOUNT,
         );
-        idx0 = idx1;
-        idx1 += 2;
-        let funding_amount = felts_to_u128(public_inputs[idx0..idx1].to_vec());
-        idx0 = idx1;
-        idx1 += 4;
-        let root_hash: [u8; 32] = felts_to_bytes(&public_inputs[idx0..idx1])
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("failed to deserialize root hash from public inputs"))?;
-        idx0 = idx1;
-        idx1 += 4;
+        let funding_amount = felts_to_u128(
+            public_inputs[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX].to_vec(),
+        );
+        let root_hash: [u8; 32] =
+            felts_to_bytes(&public_inputs[ROOT_HASH_START_INDEX..ROOT_HASH_END_INDEX])
+                .try_into()
+                .map_err(|_| {
+                    anyhow::anyhow!("failed to deserialize root hash from public inputs")
+                })?;
 
-        let exit_account = SubstrateAccount::from_field_elements(&public_inputs[idx0..idx1])?;
+        let exit_account = SubstrateAccount::from_field_elements(
+            &public_inputs[EXIT_ACCOUNT_START_INDEX..EXIT_ACCOUNT_END_INDEX],
+        )?;
 
         Ok(PublicCircuitInputs {
             funding_amount,

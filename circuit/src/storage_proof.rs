@@ -53,7 +53,7 @@ impl StorageProofTargets {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct StorageProof {
-    funding_amount: Vec<F>,
+    funding_amount: [F; FELTS_PER_AMOUNT],
     proof: Vec<Vec<F>>,
     hashes: Vec<Vec<F>>,
     root_hash: [u8; 32],

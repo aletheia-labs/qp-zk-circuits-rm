@@ -1,13 +1,12 @@
 use crate::circuit::F;
 use plonky2::field::types::{Field, PrimeField64};
 
-pub fn u128_to_felts(num: u128) -> Vec<F> {
-    let mut amount_felts: Vec<F> = Vec::with_capacity(2);
+pub const FELTS_PER_U128: usize = 2;
+
+pub fn u128_to_felts(num: u128) -> [F; FELTS_PER_U128] {
     let amount_high = F::from_noncanonical_u64((num >> 64) as u64);
     let amount_low = F::from_noncanonical_u64(num as u64);
-    amount_felts.push(amount_high);
-    amount_felts.push(amount_low);
-    amount_felts
+    [amount_high, amount_low]
 }
 
 pub fn felts_to_u128(felts: Vec<F>) -> u128 {
@@ -112,7 +111,7 @@ mod tests {
             assert_eq!(felts.len(), 2, "Expected exactly two field elements");
 
             // Vec<F> -> u128
-            let round_trip_num = felts_to_u128(felts.clone());
+            let round_trip_num = felts_to_u128(felts.to_vec());
 
             // Check that the high and low parts match
             let expected_high = (num >> 64) as u64;
@@ -147,7 +146,7 @@ mod tests {
             // u128 -> Vec<F>
             let round_trip_felts = u128_to_felts(num);
             assert_eq!(
-                round_trip_felts, felts,
+                round_trip_felts.to_vec(), felts,
                 "Round trip failed for input {:?}. Got {:?}",
                 felts, round_trip_felts
             );
@@ -160,7 +159,7 @@ mod tests {
         let num = u128::MAX;
         let felts = u128_to_felts(num);
         assert_eq!(felts.len(), 2);
-        let result = felts_to_u128(felts);
+        let result = felts_to_u128(felts.to_vec());
         let expected_high = (u128::MAX >> 64) as u64;
         let expected_low = u128::MAX as u64;
         let expected = ((expected_high as u128) << 64) | (expected_low as u128);
@@ -169,8 +168,8 @@ mod tests {
         // Test zero
         let num = 0u128;
         let felts = u128_to_felts(num);
-        assert_eq!(felts, vec![f(0), f(0)]);
-        let result = felts_to_u128(felts);
+        assert_eq!(felts.to_vec(), vec![f(0), f(0)]);
+        let result = felts_to_u128(felts.to_vec());
         assert_eq!(result, 0);
     }
 }
