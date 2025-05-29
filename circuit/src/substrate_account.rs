@@ -1,7 +1,6 @@
-use crate::circuit::{CircuitFragment, Digest, D, F};
+use crate::circuit::{CircuitFragment, D, F};
 use crate::codec::{ByteCodec, FieldElementCodec};
-use crate::inputs::CircuitInputs;
-use crate::utils::{bytes_to_felts, felts_to_bytes};
+use crate::utils::{bytes_to_felts, felts_to_bytes, Digest};
 use plonky2::{
     hash::hash_types::HashOutTarget,
     iop::witness::{PartialWitness, WitnessWrite},
@@ -38,19 +37,14 @@ impl FieldElementCodec for SubstrateAccount {
     fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
         if elements.len() != 4 {
             return Err(anyhow::anyhow!(
-                "Expected 4 field elements for ExitAccount address, got: {}",
+                "Expected 4 field elements for SubstrateAccount, got: {}",
                 elements.len()
             ));
         }
-
-        let address = elements.try_into()?;
-        Ok(Self(address))
-    }
-}
-
-impl From<&CircuitInputs> for SubstrateAccount {
-    fn from(inputs: &CircuitInputs) -> Self {
-        inputs.public.exit_account
+        let account_id: [F; 4] = elements
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Failed to convert slice to [GoldilocksField; 4]"))?;
+        Ok(Self(account_id))
     }
 }
 
@@ -68,7 +62,6 @@ impl ExitAccountTargets {
 }
 
 impl CircuitFragment for SubstrateAccount {
-    type PrivateInputs = ();
     type Targets = ExitAccountTargets;
 
     /// Builds a dummy circuit to include the exit account as a public input.
@@ -78,7 +71,6 @@ impl CircuitFragment for SubstrateAccount {
         &self,
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
-        _inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
         pw.set_hash_target(targets.address, self.0.into())
     }
@@ -100,7 +92,7 @@ mod tests {
         let targets = ExitAccountTargets::new(&mut builder);
         SubstrateAccount::circuit(&targets, &mut builder);
 
-        exit_account.fill_targets(&mut pw, targets, ()).unwrap();
+        exit_account.fill_targets(&mut pw, targets).unwrap();
         build_and_prove_test(builder, pw)
     }
 
@@ -162,7 +154,7 @@ mod tests {
         );
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 3"
+            "Expected 4 field elements for SubstrateAccount, got: 3"
         );
     }
 
@@ -186,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn exit_account_codec() {
+    fn exit_account_codec() -> anyhow::Result<()> {
         let address_bytes = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
             25, 26, 27, 28, 29, 30, 31, 32,
@@ -208,8 +200,9 @@ mod tests {
         assert_eq!(field_elements, expected_elements);
 
         // Decode the field elements back into an ExitAccount.
-        let recovered_account = SubstrateAccount::from_field_elements(&field_elements).unwrap();
+        let recovered_account = SubstrateAccount::from_field_elements(&field_elements)?;
         assert_eq!(account, recovered_account);
+        Ok(())
     }
 
     #[test]
@@ -220,7 +213,7 @@ mod tests {
         assert!(recovered_account_result.is_err());
         assert_eq!(
             recovered_account_result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 2"
+            "Expected 4 field elements for SubstrateAccount, got: 2"
         );
 
         let long_elements = vec![
@@ -235,7 +228,7 @@ mod tests {
         assert!(recovered_account_result.is_err());
         assert_eq!(
             recovered_account_result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 5"
+            "Expected 4 field elements for SubstrateAccount, got: 5"
         );
     }
 
@@ -246,7 +239,7 @@ mod tests {
         assert!(recovered_account_result.is_err());
         assert_eq!(
             recovered_account_result.unwrap_err().to_string(),
-            "Expected 4 field elements for ExitAccount address, got: 0"
+            "Expected 4 field elements for SubstrateAccount, got: 0"
         );
     }
 

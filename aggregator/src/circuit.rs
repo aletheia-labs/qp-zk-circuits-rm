@@ -1,3 +1,5 @@
+use hashbrown::HashMap;
+use plonky2::recursion::dummy_circuit::{dummy_circuit, dummy_proof};
 use plonky2::{
     field::types::Field,
     iop::{
@@ -14,6 +16,7 @@ use wormhole_circuit::{
     circuit::{CircuitFragment, C, D, F},
     gadgets::is_const_less_than,
 };
+use wormhole_prover::WormholeProver;
 use wormhole_verifier::WormholeVerifier;
 
 use crate::MAX_NUM_PROOFS_TO_AGGREGATE;
@@ -52,20 +55,26 @@ impl WormholeProofAggregatorTargets {
     }
 }
 
-pub struct WormholeProofAggregatorInputs {
-    proofs: Vec<ProofWithPublicInputs<F, C, D>>,
-    num_proofs: usize,
-}
-
 /// A circuit that aggregates proofs from the Wormhole circuit.
 pub struct WormholeProofAggregator {
     inner_verifier: WormholeVerifier,
+    num_proofs: usize,
+    proofs: Vec<ProofWithPublicInputs<F, C, D>>,
 }
 
 impl Default for WormholeProofAggregator {
     fn default() -> Self {
+        const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
+        let prover = WormholeProver::new(CIRCUIT_CONFIG);
         let inner_verifier = WormholeVerifier::default();
-        Self { inner_verifier }
+        let dummy_circuit = dummy_circuit(&prover.circuit_data.common);
+        Self {
+            inner_verifier,
+            num_proofs: 10,
+            proofs: (0..10)
+                .map(|_| dummy_proof(&dummy_circuit, HashMap::new()).unwrap())
+                .collect::<Vec<_>>(),
+        }
     }
 }
 
@@ -76,7 +85,6 @@ impl WormholeProofAggregator {
 }
 
 impl CircuitFragment for WormholeProofAggregator {
-    type PrivateInputs = WormholeProofAggregatorInputs;
     type Targets = WormholeProofAggregatorTargets;
 
     fn circuit(
@@ -107,13 +115,9 @@ impl CircuitFragment for WormholeProofAggregator {
         &self,
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
-        inputs: Self::PrivateInputs,
     ) -> anyhow::Result<()> {
-        pw.set_target(
-            targets.num_proofs,
-            F::from_canonical_usize(inputs.num_proofs),
-        )?;
-        for (proof_target, proof) in targets.proofs.iter().zip(inputs.proofs.iter()) {
+        pw.set_target(targets.num_proofs, F::from_canonical_usize(self.num_proofs))?;
+        for (proof_target, proof) in targets.proofs.iter().zip(self.proofs.iter()) {
             pw.set_proof_with_pis_target(proof_target, proof)?;
         }
 
@@ -139,14 +143,13 @@ mod tests {
     const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
 
     fn run_test(
-        inputs: WormholeProofAggregatorInputs,
+        aggregator: WormholeProofAggregator,
     ) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
         let (mut builder, mut pw) = setup_test_builder_and_witness(false);
         let targets = WormholeProofAggregatorTargets::new(&mut builder, CIRCUIT_CONFIG);
         WormholeProofAggregator::circuit(&targets, &mut builder);
 
-        let aggregator = WormholeProofAggregator::new();
-        aggregator.fill_targets(&mut pw, targets, inputs)?;
+        aggregator.fill_targets(&mut pw, targets)?;
         build_and_prove_test(builder, pw)
     }
 
@@ -163,8 +166,8 @@ mod tests {
         }
 
         let num_proofs = proofs.len();
-        let inputs = WormholeProofAggregatorInputs { proofs, num_proofs };
-        run_test(inputs).unwrap();
+        let aggregator = WormholeProofAggregator::new();
+        run_test(aggregator).unwrap();
     }
 
     #[ignore = "takes too long"]
@@ -190,7 +193,7 @@ mod tests {
         let num_proofs = proofs.len();
         proofs.extend_from_slice(&dummy_proofs);
 
-        let inputs = WormholeProofAggregatorInputs { proofs, num_proofs };
-        run_test(inputs).unwrap();
+        let aggregator = WormholeProofAggregator::new();
+        run_test(aggregator).unwrap();
     }
 }

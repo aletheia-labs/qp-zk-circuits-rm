@@ -18,7 +18,7 @@ impl CircuitInputs {
         let nullifier = Nullifier::new(&secret, DEFAULT_FUNDING_NONCE, DEFAULT_FUNDING_ACCOUNT);
         let unspendable_account = UnspendableAccount::new(&secret);
         let exit_account = SubstrateAccount::new(&[254u8; 32]).unwrap();
-
+        let storage_proof = default_storage_proof();
         Self {
             public: PublicCircuitInputs {
                 funding_amount: 0,
@@ -28,7 +28,7 @@ impl CircuitInputs {
             },
             private: PrivateCircuitInputs {
                 secret,
-                storage_proof: default_storage_proof(),
+                storage_proof,
                 funding_nonce: 0,
                 funding_account,
                 unspendable_account,
@@ -39,7 +39,8 @@ impl CircuitInputs {
 
 pub mod storage_proof {
     use crate::storage_proof::StorageProof;
-
+    #[allow(dead_code)]
+    pub const DEFAULT_FUNDING_AMOUNT: u128 = 1000;
     pub const DEFAULT_ROOT_HASH: &str =
         "77eb9d80cd12acfd902b459eb3b8876f05f31ef6a17ed5fdb060ee0e86dd8139";
     pub const DEFAULT_STORAGE_PROOF: [(&str, &str); 3] = [
@@ -59,7 +60,7 @@ pub mod storage_proof {
 
     impl StorageProof {
         pub fn test_inputs() -> Self {
-            StorageProof::new(&default_storage_proof(), default_root_hash())
+            StorageProof::new(&default_storage_proof(), default_root_hash(), 0)
         }
     }
 
@@ -79,7 +80,7 @@ pub mod storage_proof {
 }
 
 pub mod nullifier {
-    use crate::nullifier::{Nullifier, NullifierInputs};
+    use crate::nullifier::Nullifier;
 
     use super::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
 
@@ -91,13 +92,6 @@ pub mod nullifier {
                 DEFAULT_FUNDING_NONCE,
                 DEFAULT_FUNDING_ACCOUNT,
             )
-        }
-    }
-
-    impl NullifierInputs {
-        pub fn test_inputs() -> Self {
-            let secret = hex::decode(DEFAULT_SECRET).unwrap();
-            Self::new(&secret, DEFAULT_FUNDING_NONCE, DEFAULT_FUNDING_ACCOUNT)
         }
     }
 }
