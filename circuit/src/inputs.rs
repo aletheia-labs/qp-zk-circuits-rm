@@ -1,8 +1,12 @@
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::vec::Vec;
+
 use crate::circuit::{C, D, F};
 use crate::codec::FieldElementCodec;
 use crate::nullifier::Nullifier;
 use crate::substrate_account::SubstrateAccount;
-use crate::test_helpers::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
 use crate::unspendable_account::UnspendableAccount;
 use crate::utils::{felts_to_bytes, felts_to_u128};
 use anyhow::bail;
@@ -20,6 +24,10 @@ const ROOT_HASH_START_INDEX: usize = 6;
 const ROOT_HASH_END_INDEX: usize = 10;
 const EXIT_ACCOUNT_START_INDEX: usize = 10;
 const EXIT_ACCOUNT_END_INDEX: usize = 14;
+pub const DEFAULT_SECRET: &str = "9aa84f99ef2de22e3070394176868df41d6a148117a36132d010529e19b018b7";
+pub const DEFAULT_FUNDING_NONCE: u32 = 0;
+pub const DEFAULT_FUNDING_ACCOUNT: &[u8] = &[10u8; 32];
+
 /// Inputs required to commit to the wormhole circuit.
 #[derive(Debug)]
 pub struct CircuitInputs {
@@ -82,9 +90,9 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
             DEFAULT_FUNDING_NONCE,
             DEFAULT_FUNDING_ACCOUNT,
         );
-        let funding_amount = felts_to_u128(
-            public_inputs[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX].to_vec(),
-        );
+        let funding_amount = felts_to_u128(<[F; 2]>::try_from(
+            &public_inputs[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX],
+        )?);
         let root_hash: [u8; 32] =
             felts_to_bytes(&public_inputs[ROOT_HASH_START_INDEX..ROOT_HASH_END_INDEX])
                 .try_into()

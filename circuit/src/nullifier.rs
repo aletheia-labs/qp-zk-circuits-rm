@@ -1,3 +1,8 @@
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
+use std::vec::Vec;
+
 use crate::codec::ByteCodec;
 use crate::utils::{bytes_to_felts, felts_to_bytes, string_to_felt, Digest};
 use crate::{
@@ -26,7 +31,7 @@ pub const NULLIFIER_SIZE_FELTS: usize = 4 + 4 + 1 + 4;
 pub struct Nullifier {
     // FIXME: Should not be public, remove once hash is precomputed in tests.
     pub hash: Digest,
-    secret: Vec<F>,
+    pub secret: Vec<F>,
     funding_nonce: F,
     funding_account: Vec<F>,
 }
@@ -236,54 +241,5 @@ impl CircuitFragment for Nullifier {
         pw.set_target(targets.funding_nonce, self.funding_nonce)?;
         pw.set_target_arr(&targets.funding_account, &self.funding_account)?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-pub mod tests {
-    use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
-
-    use super::*;
-    use crate::circuit::{
-        tests::{build_and_prove_test, setup_test_builder_and_witness},
-        C,
-    };
-    use crate::test_helpers::DEFAULT_SECRET;
-
-    fn run_test(nullifier: &Nullifier) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
-        let (mut builder, mut pw) = setup_test_builder_and_witness(false);
-        let targets = NullifierTargets::new(&mut builder);
-        Nullifier::circuit(&targets, &mut builder);
-
-        nullifier.fill_targets(&mut pw, targets)?;
-        build_and_prove_test(builder, pw)
-    }
-
-    #[test]
-    fn build_and_verify_nullifier_proof() {
-        let nullifier = Nullifier::test_inputs();
-        run_test(&nullifier).unwrap();
-    }
-
-    #[test]
-    fn invalid_secret_fails_proof() {
-        let mut valid_nullifier = Nullifier::test_inputs();
-
-        // Flip the first byte of the preimage.
-        let mut invalid_bytes = hex::decode(DEFAULT_SECRET).unwrap();
-        invalid_bytes[0] ^= 0xFF;
-        valid_nullifier.secret = bytes_to_felts(&invalid_bytes);
-
-        let res = run_test(&valid_nullifier);
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn all_zero_preimage_is_valid_and_hashes() {
-        let preimage_bytes = vec![0u8; 64];
-        let nonce = 0;
-        let funder = [0u8; 32];
-        let nullifier = Nullifier::new(&preimage_bytes, nonce, &funder);
-        assert!(!nullifier.hash.to_vec().iter().all(Field::is_zero));
     }
 }

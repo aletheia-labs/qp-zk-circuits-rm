@@ -12,13 +12,32 @@
 //! # Example
 //!
 //! ```
-//! use wormhole_circuit::inputs::CircuitInputs;
+//! use wormhole_circuit::inputs::{CircuitInputs, PrivateCircuitInputs, PublicCircuitInputs};
+//! use wormhole_circuit::nullifier::Nullifier;
+//! use wormhole_circuit::substrate_account::SubstrateAccount;
+//! use wormhole_circuit::unspendable_account::UnspendableAccount;
 //! use wormhole_prover::WormholeProver;
 //! use plonky2::plonk::circuit_data::CircuitConfig;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! # let inputs = CircuitInputs::test_inputs();
-//! let config = CircuitConfig::standard_recursion_zk_config();
+//! // Create inputs
+//! let inputs = CircuitInputs {
+//!     private: PrivateCircuitInputs {
+//!         secret: vec![1u8; 32],
+//!         funding_nonce: 0,
+//!         funding_account: SubstrateAccount::new(&[2u8; 32])?,
+//!         storage_proof: vec![],
+//!         unspendable_account: UnspendableAccount::new(&[1u8; 32]),
+//!     },
+//!     public: PublicCircuitInputs {
+//!         funding_amount: 1000,
+//!         nullifier: Nullifier::new(&[1u8; 32], 0, &[2u8; 32]),
+//!         root_hash: [0u8; 32],
+//!         exit_account: SubstrateAccount::new(&[2u8; 32])?,
+//!     },
+//! };
+//!
+//! let config = CircuitConfig::standard_recursion_config();
 //! let prover = WormholeProver::new(config);
 //! let proof = prover.commit(&inputs)?.prove()?;
 //! # Ok(())
@@ -118,42 +137,5 @@ impl WormholeProver {
             bail!("prover has not commited to any inputs")
         }
         self.circuit_data.prove(self.partial_witness)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::WormholeProver;
-    use plonky2::plonk::circuit_data::CircuitConfig;
-    use wormhole_circuit::inputs::CircuitInputs;
-
-    const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
-
-    #[test]
-    fn commit_and_prove() {
-        let prover = WormholeProver::new(CIRCUIT_CONFIG);
-        let inputs = CircuitInputs::test_inputs();
-        prover.commit(&inputs).unwrap().prove().unwrap();
-    }
-
-    #[test]
-    #[ignore = "debug"]
-    fn get_public_inputs() {
-        let prover = WormholeProver::new(CIRCUIT_CONFIG);
-        let inputs = CircuitInputs::test_inputs();
-        let proof = prover.commit(&inputs).unwrap().prove().unwrap();
-        let public_inputs = proof.public_inputs;
-        println!("{:?}", public_inputs);
-    }
-
-    #[test]
-    fn proof_can_be_deserialized() {
-        use wormhole_circuit::inputs::PublicCircuitInputs;
-
-        let prover = WormholeProver::new(CIRCUIT_CONFIG);
-        let inputs = CircuitInputs::test_inputs();
-        let proof = prover.commit(&inputs).unwrap().prove().unwrap();
-        let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
-        println!("{:?}", public_inputs);
     }
 }
