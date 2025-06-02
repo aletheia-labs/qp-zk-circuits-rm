@@ -1,3 +1,4 @@
+use anyhow::bail;
 use hashbrown::HashMap;
 use plonky2::recursion::dummy_circuit::{dummy_circuit, dummy_proof};
 use plonky2::{
@@ -9,15 +10,14 @@ use plonky2::{
     plonk::{
         circuit_builder::CircuitBuilder,
         circuit_data::{CircuitConfig, CommonCircuitData, VerifierCircuitTarget},
-        proof::{ProofWithPublicInputs, ProofWithPublicInputsTarget},
+        proof::ProofWithPublicInputsTarget,
     },
 };
 use wormhole_circuit::{
     circuit::{CircuitFragment, C, D, F},
     gadgets::is_const_less_than,
 };
-use wormhole_prover::WormholeProver;
-use wormhole_verifier::WormholeVerifier;
+use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
 
 use crate::MAX_NUM_PROOFS_TO_AGGREGATE;
 
@@ -55,36 +55,48 @@ impl WormholeProofAggregatorTargets {
     }
 }
 
-/// A circuit that aggregates proofs from the Wormhole circuit.
-pub struct WormholeProofAggregator {
+pub struct WormholeProofAggregatorInner {
     inner_verifier: WormholeVerifier,
     num_proofs: usize,
     proofs: Vec<ProofWithPublicInputs<F, C, D>>,
 }
 
-impl Default for WormholeProofAggregator {
-    fn default() -> Self {
-        const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
-        let prover = WormholeProver::new(CIRCUIT_CONFIG);
-        let inner_verifier = WormholeVerifier::default();
-        let dummy_circuit = dummy_circuit(&prover.circuit_data.common);
+impl WormholeProofAggregatorInner {
+    pub fn new(config: CircuitConfig) -> Self {
+        let inner_verifier = WormholeVerifier::new(config, None);
         Self {
             inner_verifier,
             num_proofs: 10,
-            proofs: (0..10)
-                .map(|_| dummy_proof(&dummy_circuit, HashMap::new()).unwrap())
-                .collect::<Vec<_>>(),
+            proofs: Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE),
         }
     }
-}
 
-impl WormholeProofAggregator {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn set_proofs(
+        &mut self,
+        proofs: Vec<ProofWithPublicInputs<F, C, D>>,
+    ) -> anyhow::Result<()> {
+        let num_proofs = proofs.len();
+
+        if num_proofs > MAX_NUM_PROOFS_TO_AGGREGATE {
+            bail!("proofs to aggregate was more than the maximum allowed")
+        }
+
+        // Move proof data from the aggregater, to be used the circuit.
+        self.num_proofs = num_proofs;
+        self.proofs = proofs;
+
+        // TODO: Figure out a way to make this compatible with zk.
+        let dummy_circuit = dummy_circuit(&self.inner_verifier.circuit_data.common);
+        let dummy_proof = dummy_proof(&dummy_circuit, HashMap::new())?;
+        for _ in 0..(MAX_NUM_PROOFS_TO_AGGREGATE - num_proofs) {
+            self.proofs.push(dummy_proof.clone());
+        }
+
+        Ok(())
     }
 }
 
-impl CircuitFragment for WormholeProofAggregator {
+impl CircuitFragment for WormholeProofAggregatorInner {
     type Targets = WormholeProofAggregatorTargets;
 
     fn circuit(
