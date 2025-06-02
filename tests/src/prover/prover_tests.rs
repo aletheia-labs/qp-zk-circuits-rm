@@ -1,3 +1,5 @@
+use std::fs;
+
 use crate::test_helpers::storage_proof::TestInputs;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use wormhole_circuit::inputs::{CircuitInputs, PublicCircuitInputs};
@@ -14,6 +16,15 @@ fn commit_and_prove() {
 }
 
 #[test]
+fn proof_can_be_deserialized() {
+    let prover = WormholeProver::new(CIRCUIT_CONFIG);
+    let inputs = CircuitInputs::test_inputs();
+    let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+    let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
+    println!("{:?}", public_inputs);
+}
+
+#[test]
 #[ignore = "debug"]
 fn get_public_inputs() {
     let prover = WormholeProver::new(CIRCUIT_CONFIG);
@@ -24,10 +35,15 @@ fn get_public_inputs() {
 }
 
 #[test]
-fn proof_can_be_deserialized() {
-    let prover = WormholeProver::new(CIRCUIT_CONFIG);
+#[ignore = "debug"]
+fn export_test_proof() {
+    const FILE_PATH: &str = "dummy_proof.bin";
+
+    let circuit_config = CircuitConfig::standard_recursion_zk_config();
+
+    let prover = WormholeProver::new(circuit_config);
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
-    let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
-    println!("{:?}", public_inputs);
+    let proof_bytes = proof.to_bytes();
+    let _ = fs::write(FILE_PATH, proof_bytes);
 }
