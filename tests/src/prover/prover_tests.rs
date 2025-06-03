@@ -39,6 +39,20 @@ fn get_public_inputs() {
 fn export_test_proof() {
     const FILE_PATH: &str = "dummy_proof.bin";
 
+    let circuit_config = CircuitConfig::standard_recursion_config();
+
+    let prover = WormholeProver::new(circuit_config);
+    let inputs = CircuitInputs::test_inputs();
+    let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+    let proof_bytes = proof.to_bytes();
+    let _ = fs::write(FILE_PATH, proof_bytes);
+}
+
+#[test]
+#[ignore = "debug"]
+fn export_test_proof_zk() {
+    const FILE_PATH: &str = "dummy_proof_zk.bin";
+
     let circuit_config = CircuitConfig::standard_recursion_zk_config();
 
     let prover = WormholeProver::new(circuit_config);

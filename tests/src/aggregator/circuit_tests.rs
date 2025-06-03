@@ -12,7 +12,7 @@ use wormhole_verifier::ProofWithPublicInputs;
 fn run_test(
     proofs: Vec<ProofWithPublicInputs<F, C, D>>,
 ) -> anyhow::Result<plonky2::plonk::proof::ProofWithPublicInputs<F, C, D>> {
-    let (mut builder, mut pw) = setup_test_builder_and_witness(true);
+    let (mut builder, mut pw) = setup_test_builder_and_witness(false);
     let targets = WormholeProofAggregatorTargets::new(&mut builder, circuit_config());
     WormholeProofAggregatorInner::circuit(&targets, &mut builder);
 
