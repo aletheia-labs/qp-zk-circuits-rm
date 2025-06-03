@@ -6,7 +6,6 @@ use wormhole_prover::WormholeProver;
 use crate::{aggregator::circuit_config, test_helpers::storage_proof::TestInputs};
 
 #[test]
-#[ignore = "takes too long"]
 fn push_proof_to_buffer() {
     // Create a proof.
     let prover = WormholeProver::new(circuit_config());
@@ -21,7 +20,6 @@ fn push_proof_to_buffer() {
 }
 
 #[test]
-#[ignore = "takes too long"]
 fn push_proof_to_full_buffer() {
     // Create a proof.
     let prover = WormholeProver::new(circuit_config());
@@ -43,7 +41,6 @@ fn push_proof_to_full_buffer() {
 }
 
 #[test]
-#[ignore = "takes too long"]
 fn aggregate_single_proof() {
     // Create a proof.
     let prover = WormholeProver::new(circuit_config());

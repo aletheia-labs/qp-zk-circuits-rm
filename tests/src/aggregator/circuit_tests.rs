@@ -22,7 +22,6 @@ fn run_test(
     build_and_prove_test(builder, pw)
 }
 
-#[ignore = "takes too long"]
 #[test]
 fn build_and_verify_proof() {
     // Create proofs.
@@ -36,7 +35,6 @@ fn build_and_verify_proof() {
     run_test(proofs).unwrap();
 }
 
-#[ignore = "takes too long"]
 #[test]
 fn few_proofs_pass() {
     // Create proofs.
