@@ -1,31 +1,26 @@
 use anyhow::bail;
-use hashbrown::HashMap;
-use plonky2::recursion::dummy_circuit::{dummy_circuit, dummy_proof};
 use plonky2::{
-    field::types::Field,
-    iop::{
-        target::Target,
-        witness::{PartialWitness, WitnessWrite},
-    },
+    iop::witness::{PartialWitness, WitnessWrite},
     plonk::{
         circuit_builder::CircuitBuilder,
         circuit_data::{CircuitConfig, CommonCircuitData, VerifierCircuitTarget},
         proof::ProofWithPublicInputsTarget,
     },
 };
-use wormhole_circuit::{
-    circuit::{CircuitFragment, C, D, F},
-    gadgets::is_const_less_than,
-};
+use wormhole_circuit::circuit::{CircuitFragment, C, D, F};
 use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
 
 use crate::MAX_NUM_PROOFS_TO_AGGREGATE;
+
+#[cfg(not(feature = "no_zk"))]
+const DUMMY_PROOF_BYTES: &[u8] = include_bytes!("../data/dummy_proof_zk.bin");
+#[cfg(feature = "no_zk")]
+const DUMMY_PROOF_BYTES: &[u8] = include_bytes!("../data/dummy_proof.bin");
 
 #[derive(Debug, Clone)]
 pub struct WormholeProofAggregatorTargets {
     verifier_data: VerifierCircuitTarget,
     proofs: [ProofWithPublicInputsTarget<D>; MAX_NUM_PROOFS_TO_AGGREGATE],
-    num_proofs: Target,
     // HACK: This allows us to only create `circuit_data` once.
     circuit_data: CommonCircuitData<F, D>,
 }
@@ -37,7 +32,6 @@ impl WormholeProofAggregatorTargets {
             builder.add_virtual_verifier_data(circuit_data.fri_params.config.cap_height);
 
         // Setup targets for proofs.
-        let num_proofs = builder.add_virtual_target();
         let mut proofs = Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE);
         for _ in 0..MAX_NUM_PROOFS_TO_AGGREGATE {
             proofs.push(builder.add_virtual_proof_with_pis(&circuit_data));
@@ -49,7 +43,6 @@ impl WormholeProofAggregatorTargets {
         Self {
             verifier_data,
             proofs,
-            num_proofs,
             circuit_data,
         }
     }
@@ -66,7 +59,7 @@ impl WormholeProofAggregatorInner {
         let inner_verifier = WormholeVerifier::new(config, None);
         Self {
             inner_verifier,
-            num_proofs: 10,
+            num_proofs: 0,
             proofs: Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE),
         }
     }
@@ -85,9 +78,10 @@ impl WormholeProofAggregatorInner {
         self.num_proofs = num_proofs;
         self.proofs = proofs;
 
-        // TODO: Figure out a way to make this compatible with zk.
-        let dummy_circuit = dummy_circuit(&self.inner_verifier.circuit_data.common);
-        let dummy_proof = dummy_proof(&dummy_circuit, HashMap::new())?;
+        let dummy_proof = ProofWithPublicInputs::from_bytes(
+            DUMMY_PROOF_BYTES.to_vec(),
+            &self.inner_verifier.circuit_data.common,
+        )?;
         for _ in 0..(MAX_NUM_PROOFS_TO_AGGREGATE - num_proofs) {
             self.proofs.push(dummy_proof.clone());
         }
@@ -100,26 +94,16 @@ impl CircuitFragment for WormholeProofAggregatorInner {
     type Targets = WormholeProofAggregatorTargets;
 
     fn circuit(
-        &Self::Targets {
-            ref verifier_data,
-            ref proofs,
-            num_proofs,
-            ref circuit_data,
+        Self::Targets {
+            verifier_data,
+            proofs,
+            circuit_data,
         }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
         // Verify each aggregated proof separately.
-        let n_log = (usize::BITS - (MAX_NUM_PROOFS_TO_AGGREGATE - 1).leading_zeros()) as usize;
-        for (i, proof) in proofs.iter().enumerate() {
-            let is_proof = is_const_less_than(builder, i, num_proofs, n_log);
-            builder
-                .conditionally_verify_proof_or_dummy::<C>(
-                    is_proof,
-                    proof,
-                    verifier_data,
-                    circuit_data,
-                )
-                .unwrap();
+        for proof in proofs {
+            builder.verify_proof::<C>(proof, verifier_data, circuit_data);
         }
     }
 
@@ -128,7 +112,6 @@ impl CircuitFragment for WormholeProofAggregatorInner {
         pw: &mut PartialWitness<F>,
         targets: Self::Targets,
     ) -> anyhow::Result<()> {
-        pw.set_target(targets.num_proofs, F::from_canonical_usize(self.num_proofs))?;
         for (proof_target, proof) in targets.proofs.iter().zip(self.proofs.iter()) {
             pw.set_proof_with_pis_target(proof_target, proof)?;
         }

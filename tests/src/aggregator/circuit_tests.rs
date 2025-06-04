@@ -1,65 +1,50 @@
+#![cfg(test)]
+use crate::aggregator::circuit_config;
 use crate::circuit_helpers::{build_and_prove_test, setup_test_builder_and_witness};
 use crate::test_helpers::storage_proof::TestInputs;
-use hashbrown::HashMap;
-use plonky2::plonk::circuit_data::CircuitConfig;
-use plonky2::recursion::dummy_circuit::{dummy_circuit, dummy_proof};
 use wormhole_aggregator::circuit::{WormholeProofAggregatorInner, WormholeProofAggregatorTargets};
 use wormhole_aggregator::MAX_NUM_PROOFS_TO_AGGREGATE;
 use wormhole_circuit::circuit::{CircuitFragment, C, D, F};
 use wormhole_circuit::inputs::CircuitInputs;
 use wormhole_prover::WormholeProver;
+use wormhole_verifier::ProofWithPublicInputs;
 
-#[cfg(test)]
-const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
-
-#[cfg(test)]
-fn run_test() -> anyhow::Result<plonky2::plonk::proof::ProofWithPublicInputs<F, C, D>> {
+fn run_test(
+    proofs: Vec<ProofWithPublicInputs<F, C, D>>,
+) -> anyhow::Result<plonky2::plonk::proof::ProofWithPublicInputs<F, C, D>> {
     let (mut builder, mut pw) = setup_test_builder_and_witness(false);
-    let targets = WormholeProofAggregatorTargets::new(&mut builder, CIRCUIT_CONFIG);
+    let targets = WormholeProofAggregatorTargets::new(&mut builder, circuit_config());
     WormholeProofAggregatorInner::circuit(&targets, &mut builder);
 
-    let aggregator = WormholeProofAggregatorInner::new(CIRCUIT_CONFIG);
+    let mut aggregator = WormholeProofAggregatorInner::new(circuit_config());
+    aggregator.set_proofs(proofs)?;
     aggregator.fill_targets(&mut pw, targets)?;
     build_and_prove_test(builder, pw)
 }
 
-#[cfg(test)]
-#[ignore = "takes too long"]
 #[test]
 fn build_and_verify_proof() {
     // Create proofs.
     let mut proofs = Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE);
     for _ in 0..MAX_NUM_PROOFS_TO_AGGREGATE {
-        let prover = WormholeProver::new(CIRCUIT_CONFIG);
+        let prover = WormholeProver::new(circuit_config());
         let inputs = CircuitInputs::test_inputs();
         let proof = prover.commit(&inputs).unwrap().prove().unwrap();
         proofs.push(proof);
     }
-    run_test().unwrap();
+    run_test(proofs).unwrap();
 }
 
-#[cfg(test)]
-#[ignore = "takes too long"]
 #[test]
 fn few_proofs_pass() {
     // Create proofs.
     let mut proofs = Vec::with_capacity(MAX_NUM_PROOFS_TO_AGGREGATE);
-    let mut dummy_proofs = Vec::new();
-    for i in 0..MAX_NUM_PROOFS_TO_AGGREGATE {
-        let prover = WormholeProver::new(CIRCUIT_CONFIG);
-        if i < MAX_NUM_PROOFS_TO_AGGREGATE / 2 {
-            let inputs = CircuitInputs::test_inputs();
-            let proof = prover.commit(&inputs).unwrap().prove().unwrap();
-            proofs.push(proof);
-        } else {
-            let dummy_circuit = dummy_circuit(&prover.circuit_data.common);
-            let dummy_proof = dummy_proof(&dummy_circuit, HashMap::new()).unwrap();
-            dummy_proofs.push(dummy_proof);
-        }
+    for _ in 0..(MAX_NUM_PROOFS_TO_AGGREGATE / 2) {
+        let prover = WormholeProver::new(circuit_config());
+        let inputs = CircuitInputs::test_inputs();
+        let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+        proofs.push(proof);
     }
 
-    // Get the number of valid proofs before appending the dummy proofs.
-    proofs.extend_from_slice(&dummy_proofs);
-
-    run_test().unwrap();
+    run_test(proofs).unwrap();
 }
