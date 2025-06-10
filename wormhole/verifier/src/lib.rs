@@ -5,7 +5,7 @@
 //!
 //! The typical usage flow involves:
 //! 1. Initializing the verifier (e.g., via [`WormholeVerifier::default`] or [`WormholeVerifier::new`]).
-//! 2. Obtaining a [`ProofWithPublicInputs`] from a [`wormhole_prover::WormholeProver`].
+//! 2. Generating a [`ProofWithPublicInputs`].
 //! 3. Verifying the proof using [`WormholeVerifier::verify`].
 //!
 //!# Example
@@ -83,7 +83,7 @@ impl WormholeVerifier {
         Self { circuit_data }
     }
 
-    /// Verify a [`ProofWithPublicInputs`] generated from a [`crate::prover::WormholeProver`].
+    /// Verify a [`ProofWithPublicInputs`].
     ///
     /// # Errors
     ///
