@@ -7,12 +7,14 @@ use crate::circuit::F;
 use plonky2::field::types::{Field, PrimeField64};
 use plonky2::hash::hash_types::HashOut;
 
+pub const BYTES_PER_ELEMENT: usize = 8;
 pub const FELTS_PER_U128: usize = 2;
-pub type Digest = [F; 4];
-pub type PrivateKey = [F; 4];
 pub const DIGEST_NUM_FIELD_ELEMENTS: usize = 4;
 
 pub const ZERO_DIGEST: Digest = [F::ZERO; 4];
+
+pub type Digest = [F; 4];
+pub type PrivateKey = [F; 4];
 
 pub fn u128_to_felts(num: u128) -> [F; FELTS_PER_U128] {
     let amount_high = F::from_noncanonical_u64((num >> 64) as u64);
@@ -40,8 +42,6 @@ pub fn string_to_felt(input: &str) -> F {
 
 /// Converts a given slice into its field element representation.
 pub fn bytes_to_felts(input: &[u8]) -> Vec<F> {
-    const BYTES_PER_ELEMENT: usize = 8;
-
     let mut field_elements: Vec<F> = Vec::new();
     for chunk in input.chunks(BYTES_PER_ELEMENT) {
         let mut bytes = [0u8; 8];

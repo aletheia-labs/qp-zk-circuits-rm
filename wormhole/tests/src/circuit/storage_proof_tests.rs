@@ -1,11 +1,12 @@
-use plonky2::plonk::proof::ProofWithPublicInputs;
+use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
 use std::panic;
-use wormhole_circuit::storage_proof::{StorageProof, StorageProofTargets};
+use wormhole_circuit::{
+    storage_proof::{leaf::LeafInputs, ProcessedStorageProof, StorageProof, StorageProofTargets},
+    substrate_account::SubstrateAccount,
+};
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
-use test_helpers::storage_proof::{
-    default_root_hash, default_storage_proof, DEFAULT_FUNDING_AMOUNT,
-};
+use test_helpers::storage_proof::{default_root_hash, TestInputs};
 
 #[cfg(test)]
 fn run_test(storage_proof: &StorageProof) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
@@ -19,22 +20,14 @@ fn run_test(storage_proof: &StorageProof) -> anyhow::Result<ProofWithPublicInput
 
 #[test]
 fn build_and_verify_proof() {
-    let storage_proof = StorageProof::new(
-        &default_storage_proof(),
-        default_root_hash(),
-        DEFAULT_FUNDING_AMOUNT,
-    );
+    let storage_proof = StorageProof::test_inputs();
     run_test(&storage_proof).unwrap();
 }
 
 #[test]
 #[should_panic(expected = "set twice with different values")]
 fn invalid_root_hash_fails() {
-    let mut proof = StorageProof::new(
-        &default_storage_proof(),
-        default_root_hash(),
-        DEFAULT_FUNDING_AMOUNT,
-    );
+    let mut proof = StorageProof::test_inputs();
     proof.root_hash = [0u8; 32];
     run_test(&proof).unwrap();
 }
@@ -42,11 +35,58 @@ fn invalid_root_hash_fails() {
 #[test]
 #[should_panic(expected = "set twice with different values")]
 fn tampered_proof_fails() {
-    let mut tampered_proof = default_storage_proof();
+    let mut tampered_proof = ProcessedStorageProof::test_inputs();
 
-    // Flip the first byte in the first node hash.
-    tampered_proof[0].1[0] ^= 0xFF;
-    let proof = StorageProof::new(&tampered_proof, default_root_hash(), DEFAULT_FUNDING_AMOUNT);
+    // Flip the first byte in the first node hash. Divide by two to get the byte index.
+    let hash_index = tampered_proof.indices[0] / 2;
+    tampered_proof.proof[0][hash_index] ^= 0xFF;
+    let proof = StorageProof::new(
+        &tampered_proof,
+        default_root_hash(),
+        LeafInputs::test_inputs(),
+    );
+
+    run_test(&proof).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "set twice with different values")]
+fn invalid_nonce() {
+    let proof = ProcessedStorageProof::test_inputs();
+    let mut leaf_inputs = LeafInputs::test_inputs();
+
+    // Alter the nonce.
+    leaf_inputs.nonce = F::from_canonical_u32(5);
+
+    let proof = StorageProof::new(&proof, default_root_hash(), leaf_inputs);
+
+    run_test(&proof).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "set twice with different values")]
+fn invalid_exit_address() {
+    let proof = ProcessedStorageProof::test_inputs();
+    let mut leaf_inputs = LeafInputs::test_inputs();
+
+    // Alter the to account.
+    leaf_inputs.to_account = SubstrateAccount::new(&[0; 32]).unwrap();
+
+    let proof = StorageProof::new(&proof, default_root_hash(), leaf_inputs);
+
+    run_test(&proof).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "set twice with different values")]
+fn invalid_funding_amount() {
+    let proof = ProcessedStorageProof::test_inputs();
+    let mut leaf_inputs = LeafInputs::test_inputs();
+
+    // Alter the funding amount.
+    leaf_inputs.funding_amount = [F::from_canonical_u64(1000), F::from_canonical_u64(0)];
+
+    let proof = StorageProof::new(&proof, default_root_hash(), leaf_inputs);
 
     run_test(&proof).unwrap();
 }
@@ -61,19 +101,23 @@ fn fuzz_tampered_proof() {
 
     for i in 0..FUZZ_ITERATIONS {
         // Clone the original storage proof
-        let mut tampered_proof = default_storage_proof();
+        let mut tampered_proof = ProcessedStorageProof::test_inputs();
 
         // Randomly select a node in the proof to tamper
-        let node_index = rand::random_range(0..tampered_proof.len());
+        let node_index = rand::random_range(0..tampered_proof.proof.len());
 
         // Randomly select a byte to flip
-        let byte_index = rand::random_range(0..tampered_proof[node_index].1.len());
+        let byte_index = rand::random_range(0..tampered_proof.proof[node_index].len());
 
         // Flip random bits in the selected byte (e.g., XOR with a random value)
-        tampered_proof[node_index].1[byte_index] ^= rand::random_range(1..=255);
+        tampered_proof.proof[node_index][byte_index] ^= rand::random_range(1..=255);
 
         // Create the proof and inputs
-        let proof = StorageProof::new(&tampered_proof, default_root_hash(), DEFAULT_FUNDING_AMOUNT);
+        let proof = StorageProof::new(
+            &tampered_proof,
+            default_root_hash(),
+            LeafInputs::test_inputs(),
+        );
 
         // Catch panic from run_test
         let result = panic::catch_unwind(|| {
