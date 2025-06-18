@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use plonky2::plonk::circuit_data::{CircuitConfig, CommonCircuitData};
+use plonky2::plonk::circuit_data::CommonCircuitData;
 use wormhole_aggregator::{aggregator::WormholeProofAggregator, DEFAULT_NUM_PROOFS_TO_AGGREGATE};
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
@@ -20,9 +20,8 @@ fn deserialize_proofs(
 fn aggregate_proofs_benchmark(c: &mut Criterion) {
     c.bench_function("aggregator_aggregate_proofs", |b| {
         b.iter(|| {
-            let config = CircuitConfig::standard_recursion_zk_config();
             let mut aggregator =
-                WormholeProofAggregator::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::new(config);
+                WormholeProofAggregator::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::default();
 
             let proofs = deserialize_proofs(&aggregator.inner.inner_verifier.circuit_data.common);
 

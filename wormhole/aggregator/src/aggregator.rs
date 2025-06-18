@@ -9,34 +9,51 @@ use plonky2::{
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
-use crate::circuit::{WormholeProofAggregatorInner, WormholeProofAggregatorTargets};
+use crate::circuits::flat::{FlatAggregator, FlatAggregatorTargets};
+
+/// The method to use for aggregation proofs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AggregationMethod {
+    /// Aggregates `N` proofs into a new single, composite proof.
+    Flat,
+    /// Aggregates proofs recursively into a tree structure.
+    Tree,
+}
 
 /// A circuit that aggregates proofs from the Wormhole circuit.
 pub struct WormholeProofAggregator<const N: usize> {
-    pub inner: WormholeProofAggregatorInner<N>,
+    pub inner: FlatAggregator<N>,
     pub circuit_data: CircuitData<F, C, D>,
     partial_witness: PartialWitness<F>,
-    targets: WormholeProofAggregatorTargets<N>,
+    targets: FlatAggregatorTargets<N>,
     pub proofs_buffer: Option<Vec<ProofWithPublicInputs<F, C, D>>>,
 }
 
 impl<const N: usize> Default for WormholeProofAggregator<N> {
     fn default() -> Self {
         let config = CircuitConfig::standard_recursion_zk_config();
-        Self::new(config)
+        let aggregation_method = AggregationMethod::Flat;
+        Self::new(config, aggregation_method)
     }
 }
 
 impl<const N: usize> WormholeProofAggregator<N> {
-    pub fn new(config: CircuitConfig) -> Self {
-        let inner = WormholeProofAggregatorInner::new(config.clone());
+    pub fn new(config: CircuitConfig, aggregation_method: AggregationMethod) -> Self {
         let mut builder = CircuitBuilder::<F, D>::new(config.clone());
 
-        // Setup targets.
-        let targets = WormholeProofAggregatorTargets::new(&mut builder, config);
+        // Setup inner aggregator and targets.
+        let (inner, targets) = match aggregation_method {
+            AggregationMethod::Flat => {
+                let inner = FlatAggregator::new(config.clone());
+                let targets = FlatAggregatorTargets::new(&mut builder, config);
+                (inner, targets)
+            }
+            AggregationMethod::Tree => todo!(),
+        };
 
         // Setup circuits.
-        WormholeProofAggregatorInner::circuit(&targets, &mut builder);
+        FlatAggregator::circuit(&targets, &mut builder);
+
         let circuit_data = builder.build();
         let partial_witness = PartialWitness::new();
         let proofs_buffer = Some(Vec::with_capacity(N));

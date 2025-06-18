@@ -2,7 +2,7 @@
 use crate::aggregator::circuit_config;
 use crate::circuit_helpers::{build_and_prove_test, setup_test_builder_and_witness};
 use test_helpers::storage_proof::TestInputs;
-use wormhole_aggregator::circuit::{WormholeProofAggregatorInner, WormholeProofAggregatorTargets};
+use wormhole_aggregator::circuits::flat::{FlatAggregator, FlatAggregatorTargets};
 use wormhole_aggregator::DEFAULT_NUM_PROOFS_TO_AGGREGATE;
 use wormhole_circuit::inputs::CircuitInputs;
 use wormhole_prover::WormholeProver;
@@ -13,13 +13,13 @@ fn run_test(
     proofs: Vec<ProofWithPublicInputs<F, C, D>>,
 ) -> anyhow::Result<plonky2::plonk::proof::ProofWithPublicInputs<F, C, D>> {
     let (mut builder, mut pw) = setup_test_builder_and_witness(false);
-    let targets = WormholeProofAggregatorTargets::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::new(
+    let targets = FlatAggregatorTargets::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::new(
         &mut builder,
         circuit_config(),
     );
-    WormholeProofAggregatorInner::circuit(&targets, &mut builder);
+    FlatAggregator::circuit(&targets, &mut builder);
 
-    let mut aggregator = WormholeProofAggregatorInner::new(circuit_config());
+    let mut aggregator = FlatAggregator::new(circuit_config());
     aggregator.set_proofs(proofs)?;
     aggregator.fill_targets(&mut pw, targets)?;
     build_and_prove_test(builder, pw)
