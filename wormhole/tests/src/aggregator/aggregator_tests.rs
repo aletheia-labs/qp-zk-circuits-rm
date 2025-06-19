@@ -57,3 +57,47 @@ fn aggregate_single_proof() {
     aggregator.aggregate().unwrap();
     aggregator.prove().unwrap();
 }
+
+#[test]
+fn aggregate_proofs_into_tree() {
+    // Create a proof.
+    let prover = WormholeProver::new(circuit_config());
+    let inputs = CircuitInputs::test_inputs();
+    let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+
+    let mut aggregator =
+        WormholeProofAggregator::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::new(circuit_config());
+
+    // Fill up the proof buffer.
+    for _ in 0..DEFAULT_NUM_PROOFS_TO_AGGREGATE {
+        aggregator.push_proof(proof.clone()).unwrap();
+    }
+
+    let aggregated_proof = aggregator.aggregate_tree().unwrap();
+    aggregated_proof
+        .circuit_data
+        .verify(aggregated_proof.proof)
+        .unwrap();
+}
+
+#[test]
+fn aggregate_half_full_proof_array_into_tree() {
+    // Create a proof.
+    let prover = WormholeProver::new(circuit_config());
+    let inputs = CircuitInputs::test_inputs();
+    let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+
+    let mut aggregator =
+        WormholeProofAggregator::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::new(circuit_config());
+
+    // Fill up the proof buffer.
+    for _ in 0..DEFAULT_NUM_PROOFS_TO_AGGREGATE {
+        aggregator.push_proof(proof.clone()).unwrap();
+    }
+
+    let aggregated_proof = aggregator.aggregate_tree().unwrap();
+    aggregated_proof
+        .circuit_data
+        .verify(aggregated_proof.proof)
+        .unwrap();
+}

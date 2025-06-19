@@ -9,9 +9,12 @@ use plonky2::{
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
-use crate::circuits::{
-    flat::{FlatAggregator, FlatAggregatorTargets},
-    tree::{aggregate_to_tree, AggregatedProof},
+use crate::{
+    circuits::{
+        flat::{FlatAggregator, FlatAggregatorTargets},
+        tree::{aggregate_to_tree, AggregatedProof},
+    },
+    util::pad_with_dummy_proofs,
 };
 
 /// The method to use for aggregation proofs.
@@ -95,8 +98,9 @@ impl<const N: usize> WormholeProofAggregator<N> {
             bail!("there are no proofs to aggregate")
         };
 
+        let padded_proofs = pad_with_dummy_proofs::<N>(proofs, &self.circuit_data.common)?;
         let root_proof = aggregate_to_tree(
-            proofs,
+            padded_proofs,
             &self.circuit_data.common,
             &self.circuit_data.verifier_only,
         )?;

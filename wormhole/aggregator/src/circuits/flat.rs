@@ -1,4 +1,3 @@
-use anyhow::bail;
 use plonky2::{
     iop::witness::{PartialWitness, WitnessWrite},
     plonk::{
@@ -10,7 +9,7 @@ use plonky2::{
 use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
-use crate::circuits::DUMMY_PROOF_BYTES;
+use crate::util::pad_with_dummy_proofs;
 
 #[derive(Debug, Clone)]
 pub struct FlatAggregatorTargets<const N: usize> {
@@ -45,7 +44,6 @@ impl<const N: usize> FlatAggregatorTargets<N> {
 
 pub struct FlatAggregator<const N: usize> {
     pub inner_verifier: WormholeVerifier,
-    num_proofs: usize,
     proofs: Vec<ProofWithPublicInputs<F, C, D>>,
 }
 
@@ -54,7 +52,6 @@ impl<const N: usize> FlatAggregator<N> {
         let inner_verifier = WormholeVerifier::new(config, None);
         Self {
             inner_verifier,
-            num_proofs: 0,
             proofs: Vec::with_capacity(N),
         }
     }
@@ -63,23 +60,9 @@ impl<const N: usize> FlatAggregator<N> {
         &mut self,
         proofs: Vec<ProofWithPublicInputs<F, C, D>>,
     ) -> anyhow::Result<()> {
-        let num_proofs = proofs.len();
-
-        if num_proofs > N {
-            bail!("proofs to aggregate was more than the maximum allowed")
-        }
-
-        // Move proof data from the aggregater, to be used the circuit.
-        self.num_proofs = num_proofs;
-        self.proofs = proofs;
-
-        let dummy_proof = ProofWithPublicInputs::from_bytes(
-            DUMMY_PROOF_BYTES.to_vec(),
-            &self.inner_verifier.circuit_data.common,
-        )?;
-        for _ in 0..(N - num_proofs) {
-            self.proofs.push(dummy_proof.clone());
-        }
+        let padded_proofs =
+            pad_with_dummy_proofs::<N>(proofs, &self.inner_verifier.circuit_data.common)?;
+        self.proofs = padded_proofs;
 
         Ok(())
     }

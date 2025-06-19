@@ -1,18 +1,15 @@
-use anyhow::bail;
 use plonky2::{
     field::extension::Extendable,
     hash::hash_types::RichField,
     iop::witness::{PartialWitness, WitnessWrite},
     plonk::{
         circuit_builder::CircuitBuilder,
-        circuit_data::{CircuitConfig, CircuitData, CommonCircuitData, VerifierOnlyCircuitData},
+        circuit_data::{CircuitData, CommonCircuitData, VerifierOnlyCircuitData},
         config::GenericConfig,
     },
 };
-use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
+use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
-
-use crate::circuits::DUMMY_PROOF_BYTES;
 
 /// A proof containing both the proof data and the circuit data needed to verify it.
 #[derive(Debug)]
@@ -20,48 +17,6 @@ pub struct AggregatedProof<F: RichField + Extendable<D>, C: GenericConfig<D, F =
 {
     pub proof: ProofWithPublicInputs<F, C, D>,
     pub circuit_data: CircuitData<F, C, D>,
-}
-
-pub struct TreeAggregator<const N: usize> {
-    pub inner_verifier: WormholeVerifier,
-    num_proofs: usize,
-    proofs: Vec<ProofWithPublicInputs<F, C, D>>,
-}
-
-impl<const N: usize> TreeAggregator<N> {
-    pub fn new(config: CircuitConfig) -> Self {
-        let inner_verifier = WormholeVerifier::new(config, None);
-        Self {
-            inner_verifier,
-            num_proofs: 0,
-            proofs: Vec::with_capacity(N),
-        }
-    }
-
-    pub fn set_proofs(
-        &mut self,
-        proofs: Vec<ProofWithPublicInputs<F, C, D>>,
-    ) -> anyhow::Result<()> {
-        let num_proofs = proofs.len();
-
-        if num_proofs > N {
-            bail!("proofs to aggregate was more than the maximum allowed")
-        }
-
-        // Move proof data from the aggregater, to be used the circuit.
-        self.num_proofs = num_proofs;
-        self.proofs = proofs;
-
-        let dummy_proof = ProofWithPublicInputs::from_bytes(
-            DUMMY_PROOF_BYTES.to_vec(),
-            &self.inner_verifier.circuit_data.common,
-        )?;
-        for _ in 0..(N - num_proofs) {
-            self.proofs.push(dummy_proof.clone());
-        }
-
-        Ok(())
-    }
 }
 
 pub fn aggregate_to_tree(
