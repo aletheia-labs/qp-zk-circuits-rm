@@ -177,3 +177,79 @@ fn aggregate_pair(
     let aggregated_proof = data.prove(pw)?;
     Ok(aggregated_proof)
 }
+
+#[cfg(test)]
+mod tests {
+    use plonky2::{
+        field::types::Field,
+        iop::{
+            target::Target,
+            witness::{PartialWitness, WitnessWrite},
+        },
+        plonk::{
+            circuit_builder::CircuitBuilder,
+            circuit_data::{CircuitConfig, CircuitData},
+        },
+    };
+    use wormhole_verifier::ProofWithPublicInputs;
+    use zk_circuits_common::circuit::{C, D, F};
+
+    use crate::circuits::tree::{aggregate_pair, aggregate_to_tree};
+
+    fn generate_base_circuit() -> (CircuitData<F, C, D>, Target) {
+        let config = CircuitConfig::standard_recursion_config();
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+
+        let x = builder.add_virtual_target();
+        let x_sq = builder.mul(x, x);
+        builder.register_public_input(x_sq);
+
+        let data = builder.build::<C>();
+        (data, x)
+    }
+
+    fn prove_square(
+        circuit: &CircuitData<F, C, D>,
+        target: Target,
+        value: F,
+    ) -> ProofWithPublicInputs<F, C, D> {
+        let mut pw = PartialWitness::new();
+        pw.set_target(target, value).unwrap();
+        circuit.prove(pw).unwrap()
+    }
+
+    #[test]
+    fn recursive_aggregation_tree() {
+        let (data, target) = generate_base_circuit();
+
+        // Generate multiple leaf proofs.
+        let inputs = [
+            F::from_canonical_u64(3),
+            F::from_canonical_u64(4),
+            F::from_canonical_u64(5),
+            F::from_canonical_u64(6),
+        ];
+        let proofs = inputs
+            .iter()
+            .map(|&v| prove_square(&data, target, v))
+            .collect::<Vec<_>>();
+
+        // Aggregate into tree.
+        let root_proof = aggregate_to_tree(proofs, &data).unwrap();
+
+        // Verify final root proof.
+        data.verify(root_proof).unwrap()
+    }
+
+    #[test]
+    fn pair_aggregation() {
+        let (data, target) = generate_base_circuit();
+        let proof1 = prove_square(&data, target, F::from_canonical_u64(7));
+        let proof2 = prove_square(&data, target, F::from_canonical_u64(8));
+
+        let aggregated =
+            aggregate_pair(&proof1, &proof2, &data.common, &data.verifier_only).unwrap();
+
+        data.verify(aggregated).unwrap();
+    }
+}
