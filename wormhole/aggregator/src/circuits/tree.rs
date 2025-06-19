@@ -1,5 +1,7 @@
 use anyhow::bail;
 use plonky2::{
+    field::extension::Extendable,
+    hash::hash_types::RichField,
     iop::witness::{PartialWitness, WitnessWrite},
     plonk::{
         circuit_builder::CircuitBuilder,
@@ -7,6 +9,7 @@ use plonky2::{
             CircuitConfig, CircuitData, CommonCircuitData, VerifierCircuitTarget,
             VerifierOnlyCircuitData,
         },
+        config::GenericConfig,
         proof::ProofWithPublicInputsTarget,
     },
 };
@@ -123,19 +126,20 @@ impl<const N: usize> CircuitFragment for TreeAggregator<N> {
 
 #[allow(dead_code)]
 fn aggregate_to_tree(
-    mut proofs: Vec<ProofWithPublicInputs<F, C, D>>,
-    leaf_circuit_data: &CircuitData<F, C, D>,
-) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+    mut proofs: Vec<AggregatedProof<F, C, D>>,
+) -> anyhow::Result<AggregatedProof<F, C, D>> {
     while proofs.len() > 1 {
         let mut aggregated_proofs = Vec::with_capacity(proofs.len() / 2);
 
         for pair in proofs.chunks(2) {
-            let aggregated_proof = aggregate_pair(
-                &pair[0],
-                &pair[1],
-                &leaf_circuit_data.common,
-                &leaf_circuit_data.verifier_only,
-            )?;
+            assert_eq!(&pair[0].circuit_data, &pair[1].circuit_data);
+            let common_data = &pair[0].circuit_data.common;
+            let verifier_data = &pair[0].circuit_data.verifier_only;
+
+            let proof_a = &pair[0].proof;
+            let proof_b = &pair[1].proof;
+
+            let aggregated_proof = aggregate_pair(proof_a, proof_b, common_data, verifier_data)?;
             aggregated_proofs.push(aggregated_proof);
         }
 
@@ -146,6 +150,13 @@ fn aggregate_to_tree(
     Ok(proofs.pop().unwrap())
 }
 
+/// A proof containing both the proof data and the circuit data needed to verify it.
+#[derive(Debug)]
+struct AggregatedProof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize> {
+    proof: ProofWithPublicInputs<F, C, D>,
+    circuit_data: CircuitData<F, C, D>,
+}
+
 #[allow(dead_code)]
 /// Circuit gadget that takes in a pair of proofs, a and b, aggregates it and return the new proof.
 fn aggregate_pair(
@@ -153,7 +164,7 @@ fn aggregate_pair(
     b: &ProofWithPublicInputs<F, C, D>,
     common_data: &CommonCircuitData<F, D>,
     verifier_data: &VerifierOnlyCircuitData<C, D>,
-) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+) -> anyhow::Result<AggregatedProof<F, C, D>> {
     let mut builder = CircuitBuilder::new(common_data.config.clone());
     let verifier_data_t =
         builder.add_virtual_verifier_data(common_data.fri_params.config.cap_height);
@@ -166,7 +177,7 @@ fn aggregate_pair(
     let proof_b = builder.add_virtual_proof_with_pis(common_data);
     builder.verify_proof::<C>(&proof_b, &verifier_data_t, common_data);
 
-    let data = builder.build();
+    let circuit_data = builder.build();
 
     // Fill targets.
     let mut pw = PartialWitness::new();
@@ -174,7 +185,12 @@ fn aggregate_pair(
     pw.set_proof_with_pis_target(&proof_a, a)?;
     pw.set_proof_with_pis_target(&proof_b, b)?;
 
-    let aggregated_proof = data.prove(pw)?;
+    let proof = circuit_data.prove(pw)?;
+
+    let aggregated_proof = AggregatedProof {
+        proof,
+        circuit_data,
+    };
     Ok(aggregated_proof)
 }
 
@@ -191,10 +207,9 @@ mod tests {
             circuit_data::{CircuitConfig, CircuitData},
         },
     };
-    use wormhole_verifier::ProofWithPublicInputs;
     use zk_circuits_common::circuit::{C, D, F};
 
-    use crate::circuits::tree::{aggregate_pair, aggregate_to_tree};
+    use crate::circuits::tree::{aggregate_pair, aggregate_to_tree, AggregatedProof};
 
     fn generate_base_circuit() -> (CircuitData<F, C, D>, Target) {
         let config = CircuitConfig::standard_recursion_config();
@@ -208,20 +223,21 @@ mod tests {
         (data, x)
     }
 
-    fn prove_square(
-        circuit: &CircuitData<F, C, D>,
-        target: Target,
-        value: F,
-    ) -> ProofWithPublicInputs<F, C, D> {
+    fn prove_square(value: F) -> AggregatedProof<F, C, D> {
+        let (circuit_data, target) = generate_base_circuit();
+
         let mut pw = PartialWitness::new();
         pw.set_target(target, value).unwrap();
-        circuit.prove(pw).unwrap()
+        let proof = circuit_data.prove(pw).unwrap();
+
+        AggregatedProof {
+            proof,
+            circuit_data,
+        }
     }
 
     #[test]
     fn recursive_aggregation_tree() {
-        let (data, target) = generate_base_circuit();
-
         // Generate multiple leaf proofs.
         let inputs = [
             F::from_canonical_u64(3),
@@ -229,27 +245,28 @@ mod tests {
             F::from_canonical_u64(5),
             F::from_canonical_u64(6),
         ];
-        let proofs = inputs
-            .iter()
-            .map(|&v| prove_square(&data, target, v))
-            .collect::<Vec<_>>();
+        let proofs = inputs.iter().map(|&v| prove_square(v)).collect::<Vec<_>>();
 
         // Aggregate into tree.
-        let root_proof = aggregate_to_tree(proofs, &data).unwrap();
+        let root_proof = aggregate_to_tree(proofs).unwrap();
 
         // Verify final root proof.
-        data.verify(root_proof).unwrap()
+        root_proof.circuit_data.verify(root_proof.proof).unwrap()
     }
 
     #[test]
     fn pair_aggregation() {
-        let (data, target) = generate_base_circuit();
-        let proof1 = prove_square(&data, target, F::from_canonical_u64(7));
-        let proof2 = prove_square(&data, target, F::from_canonical_u64(8));
+        let proof1 = prove_square(F::from_canonical_u64(7));
+        let proof2 = prove_square(F::from_canonical_u64(8));
 
-        let aggregated =
-            aggregate_pair(&proof1, &proof2, &data.common, &data.verifier_only).unwrap();
+        let aggregated = aggregate_pair(
+            &proof1.proof,
+            &proof2.proof,
+            &proof1.circuit_data.common,
+            &proof1.circuit_data.verifier_only,
+        )
+        .unwrap();
 
-        data.verify(aggregated).unwrap();
+        aggregated.circuit_data.verify(aggregated.proof).unwrap();
     }
 }
