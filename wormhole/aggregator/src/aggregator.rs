@@ -3,10 +3,10 @@ use plonky2::{
     iop::witness::PartialWitness,
     plonk::{
         circuit_builder::CircuitBuilder,
-        circuit_data::{CircuitConfig, CircuitData},
+        circuit_data::{CircuitConfig, CircuitData, VerifierCircuitData},
     },
 };
-use wormhole_verifier::ProofWithPublicInputs;
+use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
 use crate::{
@@ -30,6 +30,8 @@ pub enum AggregationMethod {
 pub struct WormholeProofAggregator<const N: usize> {
     // TODO: Remove dependancy on flat aggregator.
     pub inner: FlatAggregator<N>,
+    pub leaf_circuit_data: VerifierCircuitData<F, C, D>,
+    // TODO: Let aggregator circuit set up its own builder.
     pub circuit_data: CircuitData<F, C, D>,
     partial_witness: PartialWitness<F>,
     targets: FlatAggregatorTargets<N>,
@@ -45,6 +47,8 @@ impl<const N: usize> Default for WormholeProofAggregator<N> {
 
 impl<const N: usize> WormholeProofAggregator<N> {
     pub fn new(config: CircuitConfig) -> Self {
+        let leaf_circuit_data = WormholeVerifier::new(config.clone(), None).circuit_data;
+
         let mut builder = CircuitBuilder::<F, D>::new(config.clone());
 
         // Setup inner aggregator and targets.
@@ -60,6 +64,7 @@ impl<const N: usize> WormholeProofAggregator<N> {
 
         Self {
             inner,
+            leaf_circuit_data,
             circuit_data,
             partial_witness,
             targets,
@@ -98,11 +103,11 @@ impl<const N: usize> WormholeProofAggregator<N> {
             bail!("there are no proofs to aggregate")
         };
 
-        let padded_proofs = pad_with_dummy_proofs::<N>(proofs, &self.circuit_data.common)?;
+        let padded_proofs = pad_with_dummy_proofs::<N>(proofs, &self.leaf_circuit_data.common)?;
         let root_proof = aggregate_to_tree(
             padded_proofs,
-            &self.circuit_data.common,
-            &self.circuit_data.verifier_only,
+            &self.leaf_circuit_data.common,
+            &self.leaf_circuit_data.verifier_only,
         )?;
 
         Ok(root_proof)
