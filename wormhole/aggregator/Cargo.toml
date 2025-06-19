@@ -11,6 +11,7 @@ anyhow = { workspace = true }
 plonky2 = { workspace = true }
 wormhole-prover = { path = "../prover", default-features = false }
 wormhole-verifier = { path = "../verifier", default-features = false }
+wormhole-circuit = { path = "../circuit", default-features = false }
 zk-circuits-common = { path = "../../common" }
 
 [dev-dependencies]

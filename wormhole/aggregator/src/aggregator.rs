@@ -9,7 +9,10 @@ use plonky2::{
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
-use crate::circuits::flat::{FlatAggregator, FlatAggregatorTargets};
+use crate::circuits::{
+    flat::{FlatAggregator, FlatAggregatorTargets},
+    tree::{aggregate_to_tree, AggregatedProof},
+};
 
 /// The method to use for aggregation proofs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +25,7 @@ pub enum AggregationMethod {
 
 /// A circuit that aggregates proofs from the Wormhole circuit.
 pub struct WormholeProofAggregator<const N: usize> {
+    // TODO: Remove dependancy on flat aggregator.
     pub inner: FlatAggregator<N>,
     pub circuit_data: CircuitData<F, C, D>,
     partial_witness: PartialWitness<F>,
@@ -32,24 +36,17 @@ pub struct WormholeProofAggregator<const N: usize> {
 impl<const N: usize> Default for WormholeProofAggregator<N> {
     fn default() -> Self {
         let config = CircuitConfig::standard_recursion_zk_config();
-        let aggregation_method = AggregationMethod::Flat;
-        Self::new(config, aggregation_method)
+        Self::new(config)
     }
 }
 
 impl<const N: usize> WormholeProofAggregator<N> {
-    pub fn new(config: CircuitConfig, aggregation_method: AggregationMethod) -> Self {
+    pub fn new(config: CircuitConfig) -> Self {
         let mut builder = CircuitBuilder::<F, D>::new(config.clone());
 
         // Setup inner aggregator and targets.
-        let (inner, targets) = match aggregation_method {
-            AggregationMethod::Flat => {
-                let inner = FlatAggregator::new(config.clone());
-                let targets = FlatAggregatorTargets::new(&mut builder, config);
-                (inner, targets)
-            }
-            AggregationMethod::Tree => todo!(),
-        };
+        let inner = FlatAggregator::new(config.clone());
+        let targets = FlatAggregatorTargets::new(&mut builder, config);
 
         // Setup circuits.
         FlatAggregator::circuit(&targets, &mut builder);
@@ -80,6 +77,7 @@ impl<const N: usize> WormholeProofAggregator<N> {
         Ok(())
     }
 
+    // TODO: Unify aggregation.
     pub fn aggregate(&mut self) -> anyhow::Result<()> {
         let Some(proofs) = self.proofs_buffer.take() else {
             bail!("there are no proofs to aggregate")
@@ -90,6 +88,20 @@ impl<const N: usize> WormholeProofAggregator<N> {
             .fill_targets(&mut self.partial_witness, self.targets.clone())?;
 
         Ok(())
+    }
+
+    pub fn aggregate_tree(&mut self) -> anyhow::Result<AggregatedProof<F, C, D>> {
+        let Some(proofs) = self.proofs_buffer.take() else {
+            bail!("there are no proofs to aggregate")
+        };
+
+        let root_proof = aggregate_to_tree(
+            proofs,
+            &self.circuit_data.common,
+            &self.circuit_data.verifier_only,
+        )?;
+
+        Ok(root_proof)
     }
 
     /// Prove the circuit with commited values. It's necessary to call [`WormholeProofAggregator::aggregate`]
