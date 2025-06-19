@@ -3,7 +3,10 @@ use plonky2::{
     iop::witness::{PartialWitness, WitnessWrite},
     plonk::{
         circuit_builder::CircuitBuilder,
-        circuit_data::{CircuitConfig, CommonCircuitData, VerifierCircuitTarget},
+        circuit_data::{
+            CircuitConfig, CircuitData, CommonCircuitData, VerifierCircuitTarget,
+            VerifierOnlyCircuitData,
+        },
         proof::ProofWithPublicInputsTarget,
     },
 };
@@ -116,4 +119,61 @@ impl<const N: usize> CircuitFragment for TreeAggregator<N> {
             &self.inner_verifier.circuit_data.verifier_only,
         )
     }
+}
+
+#[allow(dead_code)]
+fn aggregate_to_tree(
+    mut proofs: Vec<ProofWithPublicInputs<F, C, D>>,
+    leaf_circuit_data: &CircuitData<F, C, D>,
+) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+    while proofs.len() > 1 {
+        let mut aggregated_proofs = Vec::with_capacity(proofs.len() / 2);
+
+        for pair in proofs.chunks(2) {
+            let aggregated_proof = aggregate_pair(
+                &pair[0],
+                &pair[1],
+                &leaf_circuit_data.common,
+                &leaf_circuit_data.verifier_only,
+            )?;
+            aggregated_proofs.push(aggregated_proof);
+        }
+
+        proofs = aggregated_proofs;
+    }
+
+    assert!(proofs.len() == 1);
+    Ok(proofs.pop().unwrap())
+}
+
+#[allow(dead_code)]
+/// Circuit gadget that takes in a pair of proofs, a and b, aggregates it and return the new proof.
+fn aggregate_pair(
+    a: &ProofWithPublicInputs<F, C, D>,
+    b: &ProofWithPublicInputs<F, C, D>,
+    common_data: &CommonCircuitData<F, D>,
+    verifier_data: &VerifierOnlyCircuitData<C, D>,
+) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
+    let mut builder = CircuitBuilder::new(common_data.config.clone());
+    let verifier_data_t =
+        builder.add_virtual_verifier_data(common_data.fri_params.config.cap_height);
+
+    // Verify a.
+    let proof_a = builder.add_virtual_proof_with_pis(common_data);
+    builder.verify_proof::<C>(&proof_a, &verifier_data_t, common_data);
+
+    // Verify b.
+    let proof_b = builder.add_virtual_proof_with_pis(common_data);
+    builder.verify_proof::<C>(&proof_b, &verifier_data_t, common_data);
+
+    let data = builder.build();
+
+    // Fill targets.
+    let mut pw = PartialWitness::new();
+    pw.set_verifier_data_target(&verifier_data_t, verifier_data)?;
+    pw.set_proof_with_pis_target(&proof_a, a)?;
+    pw.set_proof_with_pis_target(&proof_b, b)?;
+
+    let aggregated_proof = data.prove(pw)?;
+    Ok(aggregated_proof)
 }
