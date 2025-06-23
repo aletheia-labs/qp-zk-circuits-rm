@@ -81,6 +81,10 @@ fn aggregate_pair(
     let proof_b = builder.add_virtual_proof_with_pis(common_data);
     builder.verify_proof::<C>(&proof_b, &verifier_data_t, common_data);
 
+    // Aggregate public inputs of proofs.
+    builder.register_public_inputs(&proof_a.public_inputs);
+    builder.register_public_inputs(&proof_b.public_inputs);
+
     let circuit_data = builder.build();
 
     // Fill targets.
