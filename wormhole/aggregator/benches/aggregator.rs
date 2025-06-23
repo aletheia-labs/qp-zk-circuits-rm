@@ -6,7 +6,7 @@ use wormhole_aggregator::{aggregator::WormholeProofAggregator, DEFAULT_NUM_PROOF
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 
-const MEASUREMENT_TIME_S: u64 = 100;
+const MEASUREMENT_TIME_S: u64 = 600;
 const DUMMY_PROOF_BYTES: &[u8] = include_bytes!("../data/dummy_proof_zk.bin");
 
 fn deserialize_proofs(

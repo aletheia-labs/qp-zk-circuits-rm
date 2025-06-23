@@ -11,6 +11,8 @@ use plonky2::{
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 
+use crate::TREE_BRANCHING_FACTOR;
+
 /// A proof containing both the proof data and the circuit data needed to verify it.
 #[derive(Debug)]
 pub struct AggregatedProof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
@@ -47,9 +49,9 @@ fn aggregate_level(
     common_data: &CommonCircuitData<F, D>,
     verifier_data: &VerifierOnlyCircuitData<C, D>,
 ) -> anyhow::Result<Vec<AggregatedProof<F, C, D>>> {
-    let mut aggregated_proofs = Vec::with_capacity(proofs.len() / 2);
+    let mut aggregated_proofs = Vec::with_capacity(proofs.len() / TREE_BRANCHING_FACTOR);
 
-    for pair in proofs.chunks(2) {
+    for pair in proofs.chunks(TREE_BRANCHING_FACTOR) {
         let proof_a = &pair[0];
         let proof_b = &pair[1];
 
