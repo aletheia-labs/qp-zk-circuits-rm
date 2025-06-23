@@ -8,6 +8,7 @@ use plonky2::{
         config::GenericConfig,
     },
 };
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 
@@ -44,6 +45,7 @@ pub fn aggregate_to_tree(
     Ok(proofs.pop().unwrap())
 }
 
+#[cfg(not(feature = "multithread"))]
 fn aggregate_level(
     proofs: Vec<ProofWithPublicInputs<F, C, D>>,
     common_data: &CommonCircuitData<F, D>,
@@ -60,6 +62,23 @@ fn aggregate_level(
     }
 
     Ok(aggregated_proofs)
+}
+
+#[cfg(feature = "multithread")]
+fn aggregate_level(
+    proofs: Vec<ProofWithPublicInputs<F, C, D>>,
+    common_data: &CommonCircuitData<F, D>,
+    verifier_data: &VerifierOnlyCircuitData<C, D>,
+) -> anyhow::Result<Vec<AggregatedProof<F, C, D>>> {
+    proofs
+        .par_chunks(TREE_BRANCHING_FACTOR)
+        .map(|pair| {
+            let proof_a = &pair[0];
+            let proof_b = &pair[1];
+
+            aggregate_pair(proof_a, proof_b, common_data, verifier_data)
+        })
+        .collect()
 }
 
 /// Circuit gadget that takes in a pair of proofs, a and b, aggregates it and return the new proof.
@@ -180,5 +199,23 @@ mod tests {
         .unwrap();
 
         aggregated.circuit_data.verify(aggregated.proof).unwrap();
+    }
+
+    #[test]
+    fn public_inputs_are_aggregated() {
+        let proof1 = prove_square(F::from_canonical_u64(7));
+        let proof2 = prove_square(F::from_canonical_u64(8));
+
+        let aggregated = aggregate_pair(
+            &proof1.proof,
+            &proof2.proof,
+            &proof1.circuit_data.common,
+            &proof1.circuit_data.verifier_only,
+        )
+        .unwrap();
+
+        println!("{:?}", aggregated.proof.public_inputs);
+
+        assert_eq!(aggregated.proof.public_inputs.len(), 2);
     }
 }
