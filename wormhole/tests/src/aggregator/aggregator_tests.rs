@@ -55,7 +55,6 @@ fn aggregate_single_proof() {
     aggregator.push_proof(proof).unwrap();
 
     aggregator.aggregate().unwrap();
-    aggregator.prove().unwrap();
 }
 
 #[test]
@@ -73,7 +72,7 @@ fn aggregate_proofs_into_tree() {
         aggregator.push_proof(proof.clone()).unwrap();
     }
 
-    let aggregated_proof = aggregator.aggregate_tree().unwrap();
+    let aggregated_proof = aggregator.aggregate().unwrap();
     aggregated_proof
         .circuit_data
         .verify(aggregated_proof.proof)
@@ -95,7 +94,7 @@ fn aggregate_half_full_proof_array_into_tree() {
         aggregator.push_proof(proof.clone()).unwrap();
     }
 
-    let aggregated_proof = aggregator.aggregate_tree().unwrap();
+    let aggregated_proof = aggregator.aggregate().unwrap();
     aggregated_proof
         .circuit_data
         .verify(aggregated_proof.proof)

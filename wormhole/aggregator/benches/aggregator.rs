@@ -23,14 +23,13 @@ fn aggregate_proofs_benchmark(c: &mut Criterion) {
             let mut aggregator =
                 WormholeProofAggregator::<{ DEFAULT_NUM_PROOFS_TO_AGGREGATE }>::default();
 
-            let proofs = deserialize_proofs(&aggregator.inner.inner_verifier.circuit_data.common);
+            let proofs = deserialize_proofs(&aggregator.leaf_circuit_data.common);
 
             for proof in proofs.clone() {
                 aggregator.push_proof(proof).unwrap();
             }
 
             aggregator.aggregate().unwrap();
-            aggregator.prove().unwrap();
         });
     });
 }
