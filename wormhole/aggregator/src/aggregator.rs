@@ -11,7 +11,7 @@ use crate::{
 /// A circuit that aggregates proofs from the Wormhole circuit.
 pub struct WormholeProofAggregator {
     pub leaf_circuit_data: VerifierCircuitData<F, C, D>,
-    pub aggregation_config: TreeAggregationConfig,
+    pub config: TreeAggregationConfig,
     pub proofs_buffer: Option<Vec<ProofWithPublicInputs<F, C, D>>>,
 }
 
@@ -30,19 +30,19 @@ impl WormholeProofAggregator {
 
         Self {
             leaf_circuit_data,
-            aggregation_config,
+            config: aggregation_config,
             proofs_buffer,
         }
     }
 
-    pub fn with_config(mut self, aggregation_config: TreeAggregationConfig) -> Self {
-        self.aggregation_config = aggregation_config;
+    pub fn with_config(mut self, config: TreeAggregationConfig) -> Self {
+        self.config = config;
         self
     }
 
     pub fn push_proof(&mut self, proof: ProofWithPublicInputs<F, C, D>) -> anyhow::Result<()> {
         if let Some(proofs_buffer) = self.proofs_buffer.as_mut() {
-            if proofs_buffer.len() >= self.aggregation_config.num_leaf_proofs {
+            if proofs_buffer.len() >= self.config.num_leaf_proofs {
                 bail!("tried to add proof when proof buffer is full")
             }
             proofs_buffer.push(proof);
@@ -61,14 +61,14 @@ impl WormholeProofAggregator {
 
         let padded_proofs = pad_with_dummy_proofs(
             proofs,
-            self.aggregation_config.num_leaf_proofs,
+            self.config.num_leaf_proofs,
             &self.leaf_circuit_data.common,
         )?;
         let root_proof = aggregate_to_tree(
             padded_proofs,
             &self.leaf_circuit_data.common,
             &self.leaf_circuit_data.verifier_only,
-            self.aggregation_config,
+            self.config,
         )?;
 
         Ok(root_proof)
