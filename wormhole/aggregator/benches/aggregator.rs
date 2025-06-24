@@ -1,37 +1,49 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use plonky2::plonk::circuit_data::CommonCircuitData;
 use wormhole_aggregator::aggregator::WormholeProofAggregator;
+use wormhole_aggregator::circuits::tree::TreeAggregationConfig;
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 
 const DUMMY_PROOF_BYTES: &[u8] = include_bytes!("../data/dummy_proof_zk.bin");
 
-fn deserialize_proofs<const N: usize>(
+fn deserialize_proofs(
     common_data: &CommonCircuitData<F, D>,
-) -> [ProofWithPublicInputs<F, C, D>; N] {
-    let proof = ProofWithPublicInputs::from_bytes(DUMMY_PROOF_BYTES.to_vec(), common_data).unwrap();
-    std::array::from_fn(|_| proof.clone())
+    len: usize,
+) -> Vec<ProofWithPublicInputs<F, C, D>> {
+    (0..len)
+        .map(|_| {
+            ProofWithPublicInputs::from_bytes(DUMMY_PROOF_BYTES.to_vec(), common_data).unwrap()
+        })
+        .collect()
 }
 
 // A macro for creating an aggregation benchmark with a specified number of proofs to
-// aggregate. The number of proofs is expected to be some constant, N, that can be expressed as `2^M`.
+// aggregate. The number of proofs is gotten by the tree branching factor and the tree depth.
 macro_rules! aggregate_proofs_benchmark {
-    ($fn_name:ident, $num_proofs:expr) => {
+    ($fn_name:ident, $tree_branching_factor:expr, $tree_depth:expr) => {
         pub fn $fn_name(c: &mut Criterion) {
-            const N: usize = $num_proofs;
+            let config = TreeAggregationConfig::new($tree_branching_factor, $tree_depth);
 
             // Setup proofs.
             let proofs = {
-                let temp_aggregator = WormholeProofAggregator::<N>::default();
-                deserialize_proofs::<N>(&temp_aggregator.leaf_circuit_data.common)
+                let temp_aggregator = WormholeProofAggregator::default().with_config(config);
+                deserialize_proofs(
+                    &temp_aggregator.leaf_circuit_data.common,
+                    config.num_leaf_proofs,
+                )
             };
 
             c.bench_function(
-                &format!("aggregate_proofs_{}", stringify!($num_proofs)),
+                &format!(
+                    "aggregate_proofs_{}_{}",
+                    config.tree_branching_factor, config.tree_depth
+                ),
                 |b| {
                     b.iter_batched(
                         || {
-                            let mut aggregator = WormholeProofAggregator::<N>::default();
+                            let mut aggregator =
+                                WormholeProofAggregator::default().with_config(config);
                             for proof in proofs.clone() {
                                 aggregator.push_proof(proof).unwrap();
                             }
@@ -49,22 +61,29 @@ macro_rules! aggregate_proofs_benchmark {
 }
 
 macro_rules! verify_aggregate_proof_benchmark {
-    ($fn_name:ident, $num_proofs:expr) => {
+    ($fn_name:ident, $tree_branching_factor:expr, $tree_depth:expr) => {
         pub fn $fn_name(c: &mut Criterion) {
-            const N: usize = $num_proofs;
+            let config = TreeAggregationConfig::new($tree_branching_factor, $tree_depth);
 
             // Setup proofs.
             let proofs = {
-                let temp_aggregator = WormholeProofAggregator::<N>::default();
-                deserialize_proofs::<N>(&temp_aggregator.leaf_circuit_data.common)
+                let temp_aggregator = WormholeProofAggregator::default().with_config(config);
+                deserialize_proofs(
+                    &temp_aggregator.leaf_circuit_data.common,
+                    config.num_leaf_proofs,
+                )
             };
 
             c.bench_function(
-                &format!("verify_aggregate_proof_{}", stringify!($num_proofs)),
+                &format!(
+                    "verify_aggregate_proof_{}_{}",
+                    config.tree_branching_factor, config.tree_depth
+                ),
                 |b| {
                     b.iter_batched(
                         || {
-                            let mut aggregator = WormholeProofAggregator::<N>::default();
+                            let mut aggregator =
+                                WormholeProofAggregator::default().with_config(config);
                             for proof in proofs.clone() {
                                 aggregator.push_proof(proof).unwrap();
                             }
@@ -84,18 +103,31 @@ macro_rules! verify_aggregate_proof_benchmark {
     };
 }
 
-// Various proof sizes.
-aggregate_proofs_benchmark!(bench_aggregate_2_proofs, 2);
-aggregate_proofs_benchmark!(bench_aggregate_4_proofs, 4);
-aggregate_proofs_benchmark!(bench_aggregate_8_proofs, 8);
-aggregate_proofs_benchmark!(bench_aggregate_16_proofs, 16);
-aggregate_proofs_benchmark!(bench_aggregate_32_proofs, 32);
+// Various proof sizes with binary trees.
+aggregate_proofs_benchmark!(bench_aggregate_2_proofs, 2, 1);
+aggregate_proofs_benchmark!(bench_aggregate_4_proofs, 2, 2);
+aggregate_proofs_benchmark!(bench_aggregate_8_proofs, 2, 3);
+aggregate_proofs_benchmark!(bench_aggregate_16_proofs, 2, 4);
+aggregate_proofs_benchmark!(bench_aggregate_32_proofs, 2, 5);
 
-verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_2, 2);
-verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_4, 4);
-verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_8, 8);
-verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_16, 16);
-verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_32, 32);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_2, 2, 1);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_4, 2, 2);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_8, 2, 3);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_16, 2, 4);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_32, 2, 5);
+
+// Different tree configurations.
+aggregate_proofs_benchmark!(bench_aggregate_proofs_3_2, 3, 2);
+aggregate_proofs_benchmark!(bench_aggregate_proofs_4_2, 4, 2);
+aggregate_proofs_benchmark!(bench_aggregate_proofs_5_2, 5, 2);
+aggregate_proofs_benchmark!(bench_aggregate_proofs_6_2, 6, 2);
+aggregate_proofs_benchmark!(bench_aggregate_proofs_7_2, 7, 2);
+
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_3_2, 3, 2);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_4_2, 4, 2);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_8_2, 5, 2);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_6_2, 6, 2);
+verify_aggregate_proof_benchmark!(bench_verify_aggregate_proof_7_2, 7, 2);
 
 criterion_group!(
     name = benches;
@@ -103,5 +135,7 @@ criterion_group!(
         .sample_size(10);
     targets = bench_aggregate_2_proofs, bench_aggregate_4_proofs, bench_aggregate_8_proofs, bench_aggregate_16_proofs, bench_aggregate_32_proofs,
               bench_verify_aggregate_proof_2, bench_verify_aggregate_proof_4, bench_verify_aggregate_proof_8, bench_verify_aggregate_proof_16, bench_verify_aggregate_proof_32,
+              bench_aggregate_proofs_3_2, bench_aggregate_proofs_4_2, bench_aggregate_proofs_5_2, bench_aggregate_proofs_6_2, bench_aggregate_proofs_7_2,
+              bench_verify_aggregate_proof_3_2, bench_verify_aggregate_proof_4_2, bench_verify_aggregate_proof_8_2, bench_verify_aggregate_proof_6_2, bench_verify_aggregate_proof_7_2,
 );
 criterion_main!(benches);
