@@ -1,58 +1,48 @@
 use anyhow::bail;
-use plonky2::{
-    iop::witness::PartialWitness,
-    plonk::{
-        circuit_builder::CircuitBuilder,
-        circuit_data::{CircuitConfig, CircuitData},
-    },
-};
-use wormhole_verifier::ProofWithPublicInputs;
-use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
+use plonky2::plonk::circuit_data::{CircuitConfig, VerifierCircuitData};
+use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
+use zk_circuits_common::circuit::{C, D, F};
 
-use crate::circuit::{WormholeProofAggregatorInner, WormholeProofAggregatorTargets};
+use crate::{
+    circuits::tree::{aggregate_to_tree, AggregatedProof, TreeAggregationConfig},
+    util::pad_with_dummy_proofs,
+};
 
 /// A circuit that aggregates proofs from the Wormhole circuit.
-pub struct WormholeProofAggregator<const N: usize> {
-    pub inner: WormholeProofAggregatorInner<N>,
-    pub circuit_data: CircuitData<F, C, D>,
-    partial_witness: PartialWitness<F>,
-    targets: WormholeProofAggregatorTargets<N>,
+pub struct WormholeProofAggregator {
+    pub leaf_circuit_data: VerifierCircuitData<F, C, D>,
+    pub config: TreeAggregationConfig,
     pub proofs_buffer: Option<Vec<ProofWithPublicInputs<F, C, D>>>,
 }
 
-impl<const N: usize> Default for WormholeProofAggregator<N> {
+impl Default for WormholeProofAggregator {
     fn default() -> Self {
-        let config = CircuitConfig::standard_recursion_zk_config();
-        Self::new(config)
+        let circuit_config = CircuitConfig::standard_recursion_zk_config();
+        Self::new(circuit_config)
     }
 }
 
-impl<const N: usize> WormholeProofAggregator<N> {
-    pub fn new(config: CircuitConfig) -> Self {
-        let inner = WormholeProofAggregatorInner::new(config.clone());
-        let mut builder = CircuitBuilder::<F, D>::new(config.clone());
-
-        // Setup targets.
-        let targets = WormholeProofAggregatorTargets::new(&mut builder, config);
-
-        // Setup circuits.
-        WormholeProofAggregatorInner::circuit(&targets, &mut builder);
-        let circuit_data = builder.build();
-        let partial_witness = PartialWitness::new();
-        let proofs_buffer = Some(Vec::with_capacity(N));
+impl WormholeProofAggregator {
+    pub fn new(circuit_config: CircuitConfig) -> Self {
+        let leaf_circuit_data = WormholeVerifier::new(circuit_config.clone(), None).circuit_data;
+        let aggregation_config = TreeAggregationConfig::default();
+        let proofs_buffer = Some(Vec::with_capacity(aggregation_config.num_leaf_proofs));
 
         Self {
-            inner,
-            circuit_data,
-            partial_witness,
-            targets,
+            leaf_circuit_data,
+            config: aggregation_config,
             proofs_buffer,
         }
     }
 
+    pub fn with_config(mut self, config: TreeAggregationConfig) -> Self {
+        self.config = config;
+        self
+    }
+
     pub fn push_proof(&mut self, proof: ProofWithPublicInputs<F, C, D>) -> anyhow::Result<()> {
         if let Some(proofs_buffer) = self.proofs_buffer.as_mut() {
-            if proofs_buffer.len() >= N {
+            if proofs_buffer.len() >= self.config.num_leaf_proofs {
                 bail!("tried to add proof when proof buffer is full")
             }
             proofs_buffer.push(proof);
@@ -63,25 +53,24 @@ impl<const N: usize> WormholeProofAggregator<N> {
         Ok(())
     }
 
-    pub fn aggregate(&mut self) -> anyhow::Result<()> {
+    /// Aggregates `N` number of leaf proofs into an [`AggregatedProof`].
+    pub fn aggregate(&mut self) -> anyhow::Result<AggregatedProof<F, C, D>> {
         let Some(proofs) = self.proofs_buffer.take() else {
             bail!("there are no proofs to aggregate")
         };
 
-        self.inner.set_proofs(proofs)?;
-        self.inner
-            .fill_targets(&mut self.partial_witness, self.targets.clone())?;
+        let padded_proofs = pad_with_dummy_proofs(
+            proofs,
+            self.config.num_leaf_proofs,
+            &self.leaf_circuit_data.common,
+        )?;
+        let root_proof = aggregate_to_tree(
+            padded_proofs,
+            &self.leaf_circuit_data.common,
+            &self.leaf_circuit_data.verifier_only,
+            self.config,
+        )?;
 
-        Ok(())
-    }
-
-    /// Prove the circuit with commited values. It's necessary to call [`WormholeProofAggregator::aggregate`]
-    /// before running this function.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the prover has not commited to any inputs.
-    pub fn prove(self) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
-        self.circuit_data.prove(self.partial_witness)
+        Ok(root_proof)
     }
 }
