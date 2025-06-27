@@ -241,7 +241,10 @@ impl CircuitFragment for StorageProof {
         let funding_account = felts_to_hashout(&self.leaf_inputs.funding_account.0);
         let to_account = felts_to_hashout(&self.leaf_inputs.to_account.0);
 
-        pw.set_target(targets.leaf_inputs.nonce, self.leaf_inputs.nonce)?;
+        pw.set_target(
+            targets.leaf_inputs.transfer_count,
+            self.leaf_inputs.transfer_count,
+        )?;
         pw.set_hash_target(targets.leaf_inputs.funding_account, funding_account)?;
         pw.set_hash_target(targets.leaf_inputs.to_account, to_account)?;
         pw.set_target_arr(

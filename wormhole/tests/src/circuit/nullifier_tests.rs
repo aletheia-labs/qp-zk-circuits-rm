@@ -1,5 +1,5 @@
 use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
-use test_helpers::{DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_NONCE, DEFAULT_SECRET};
+use test_helpers::{DEFAULT_SECRET, DEFAULT_TRANSFER_COUNT};
 use wormhole_circuit::{
     codec::FieldElementCodec,
     nullifier::{Nullifier, NullifierTargets},
@@ -24,7 +24,7 @@ pub trait TestInputs {
 impl TestInputs for Nullifier {
     fn test_inputs() -> Self {
         let secret = hex::decode(DEFAULT_SECRET).unwrap();
-        Self::new(&secret, DEFAULT_FUNDING_NONCE, &DEFAULT_FUNDING_ACCOUNT)
+        Self::new(&secret, DEFAULT_TRANSFER_COUNT)
     }
 }
 
@@ -50,20 +50,18 @@ fn invalid_secret_fails_proof() {
 #[test]
 fn all_zero_preimage_is_valid_and_hashes() {
     let preimage_bytes = vec![0u8; 64];
-    let nonce = 0;
-    let funder = [0u8; 32];
-    let nullifier = Nullifier::new(&preimage_bytes, nonce, &funder);
+    let nullifier = Nullifier::new(&preimage_bytes, DEFAULT_TRANSFER_COUNT);
     let field_elements = nullifier.to_field_elements();
     assert!(!field_elements.iter().all(Field::is_zero));
 }
 
 #[test]
 fn nullifier_codec() {
-    let nullifier = Nullifier::new(&[1u8; 32], 0, &[2u8; 32]);
+    let nullifier = Nullifier::new(&[1u8; 32], DEFAULT_TRANSFER_COUNT);
 
     // Encode the account as field elements and compare.
     let field_elements = nullifier.to_field_elements();
-    assert_eq!(field_elements.len(), 13);
+    assert_eq!(field_elements.len(), 9);
 
     // Decode the field elements back into a Nullifier
     let recovered_nullifier = Nullifier::from_field_elements(&field_elements).unwrap();
@@ -78,7 +76,7 @@ fn codec_invalid_length() {
     assert!(recovered_nullifier_result.is_err());
     assert_eq!(
         recovered_nullifier_result.unwrap_err().to_string(),
-        "Expected 13 field elements for Nullifier, got: 2"
+        "Expected 9 field elements for Nullifier, got: 2"
     );
 }
 
@@ -90,6 +88,6 @@ fn codec_empty_elements() {
     assert!(recovered_nullifier_result.is_err());
     assert_eq!(
         recovered_nullifier_result.unwrap_err().to_string(),
-        "Expected 13 field elements for Nullifier, got: 0"
+        "Expected 9 field elements for Nullifier, got: 0"
     );
 }

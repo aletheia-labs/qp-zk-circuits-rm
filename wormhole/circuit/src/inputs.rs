@@ -105,7 +105,7 @@ pub struct PrivateCircuitInputs {
     /// Each element is a tuple where the items are the left and right splits of a proof node split
     /// in half at the expected childs hash index.
     pub storage_proof: ProcessedStorageProof,
-    pub funding_nonce: u32,
+    pub transfer_count: u64,
     pub funding_account: BytesDigest,
     /// The unspendable account hash.
     pub unspendable_account: BytesDigest,
