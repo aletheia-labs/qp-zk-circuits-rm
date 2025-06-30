@@ -165,14 +165,13 @@ impl From<&CircuitInputs> for Nullifier {
 
 #[derive(Debug, Clone)]
 pub struct NullifierTargets {
-    hash: HashOutTarget,
+    pub hash: HashOutTarget,
     pub secret: Vec<Target>,
-    transfer_count: Target,
+    pub transfer_count: Target,
 }
 
 impl NullifierTargets {
     pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
-        // TODO: reuse target from other fragment here
         Self {
             hash: builder.add_virtual_hash_public_input(),
             secret: builder.add_virtual_targets(SECRET_NUM_TARGETS),

@@ -55,6 +55,9 @@ impl WormholeCircuit {
         StorageProof::circuit(&targets.storage_proof, &mut builder);
         SubstrateAccount::circuit(&targets.exit_account, &mut builder);
 
+        // Ensure that shared inputs to each fragment are the same.
+        connect_shared_targets(&targets, &mut builder);
+
         Self { builder, targets }
     }
 
@@ -73,4 +76,22 @@ impl WormholeCircuit {
     pub fn build_verifier(self) -> VerifierCircuitData<F, C, D> {
         self.builder.build_verifier()
     }
+}
+
+fn connect_shared_targets(targets: &CircuitTargets, builder: &mut CircuitBuilder<F, D>) {
+    // Secret.
+    for (&a, &b) in targets
+        .nullifier
+        .secret
+        .iter()
+        .zip(&targets.unspendable_account.secret)
+    {
+        builder.connect(a, b);
+    }
+
+    // Transfer count.
+    builder.connect(
+        targets.storage_proof.leaf_inputs.transfer_count,
+        targets.nullifier.transfer_count,
+    );
 }
