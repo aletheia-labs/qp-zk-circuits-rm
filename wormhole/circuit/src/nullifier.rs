@@ -2,9 +2,11 @@
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use std::vec::Vec;
+use zk_circuits_common::utils::fixed_bytes_to_felts;
 
 use crate::codec::ByteCodec;
 use crate::codec::FieldElementCodec;
+use crate::inputs::BytesDigest;
 use crate::inputs::CircuitInputs;
 use plonky2::field::types::Field;
 use plonky2::{
@@ -34,7 +36,19 @@ pub struct Nullifier {
 }
 
 impl Nullifier {
-    pub fn new(secret: &[u8], transfer_count: u64) -> Self {
+    pub fn new(digest: BytesDigest, secret: &[u8], transfer_count: u64) -> Self {
+        let hash = fixed_bytes_to_felts(*digest);
+        let secret = bytes_to_felts(secret);
+        let transfer_count = F::from_noncanonical_u64(transfer_count);
+
+        Self {
+            hash,
+            secret,
+            transfer_count,
+        }
+    }
+
+    pub fn from_preimage(secret: &[u8], transfer_count: u64) -> Self {
         let mut preimage = Vec::new();
 
         let salt = string_to_felt(NULLIFIER_SALT);
@@ -159,7 +173,11 @@ impl FieldElementCodec for Nullifier {
 
 impl From<&CircuitInputs> for Nullifier {
     fn from(inputs: &CircuitInputs) -> Self {
-        Self::new(&inputs.private.secret, inputs.private.transfer_count)
+        Self::new(
+            inputs.public.nullifier,
+            &inputs.private.secret,
+            inputs.private.transfer_count,
+        )
     }
 }
 
