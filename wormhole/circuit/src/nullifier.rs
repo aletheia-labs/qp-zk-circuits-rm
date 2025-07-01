@@ -1,5 +1,7 @@
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+use core::mem::size_of;
+
 #[cfg(feature = "std")]
 use std::vec::Vec;
 use zk_circuits_common::utils::fixed_bytes_to_felts;
@@ -198,6 +200,7 @@ impl NullifierTargets {
     }
 }
 
+#[cfg(feature = "std")]
 impl CircuitFragment for Nullifier {
     type Targets = NullifierTargets;
 

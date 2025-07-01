@@ -6,4 +6,9 @@
 .envrc
 
 Cargo.lock
-circuit/.DS_Store
+**/.DS_Store
+
+# generated binary files
+/generated-bins
+wormhole/tests/*.bin
+wormhole/tests/*.hex

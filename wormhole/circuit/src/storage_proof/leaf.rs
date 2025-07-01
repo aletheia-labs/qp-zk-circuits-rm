@@ -1,7 +1,13 @@
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+#[cfg(not(feature = "std"))]
+use core::array;
 use plonky2::field::types::Field;
 use plonky2::{
     hash::hash_types::HashOutTarget, iop::target::Target, plonk::circuit_builder::CircuitBuilder,
 };
+#[cfg(feature = "std")]
+use std::array;
 
 use crate::codec::ByteCodec;
 use crate::inputs::{BytesDigest, CircuitInputs};
@@ -24,7 +30,7 @@ impl LeafTargets {
         let transfer_count = builder.add_virtual_target();
         let funding_account = builder.add_virtual_hash();
         let to_account = builder.add_virtual_hash();
-        let funding_amount = std::array::from_fn(|_| builder.add_virtual_public_input());
+        let funding_amount = array::from_fn(|_| builder.add_virtual_public_input());
 
         Self {
             transfer_count,
@@ -35,7 +41,7 @@ impl LeafTargets {
     }
 
     pub fn collect_to_vec(&self) -> Vec<Target> {
-        std::iter::once(self.transfer_count)
+        core::iter::once(self.transfer_count)
             .chain(self.funding_account.elements)
             .chain(self.to_account.elements)
             .chain(self.funding_amount)
