@@ -19,6 +19,8 @@ pub const DEFAULT_TO_ACCOUNT: [u8; 32] = [
     79, 182, 30, 173, 18, 214, 38, 123, 184, 36, 10,
 ];
 
+pub const DEFAULT_EXIT_ACCOUNT: [u8; 32] = [4u8; 32];
+
 impl TestInputs for CircuitInputs {
     fn test_inputs() -> Self {
         let secret = hex::decode(DEFAULT_SECRET.trim()).unwrap();
@@ -33,7 +35,7 @@ impl TestInputs for CircuitInputs {
             .hash
             .into();
         let unspendable_account = UnspendableAccount::from_secret(&secret).account_id.into();
-        let exit_account = BytesDigest::from(DEFAULT_TO_ACCOUNT);
+        let exit_account = BytesDigest::from(DEFAULT_EXIT_ACCOUNT);
 
         let storage_proof = ProcessedStorageProof::test_inputs();
         Self {

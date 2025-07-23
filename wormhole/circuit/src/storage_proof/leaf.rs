@@ -84,7 +84,7 @@ impl TryFrom<&CircuitInputs> for LeafInputs {
         Self::new(
             inputs.private.transfer_count,
             inputs.private.funding_account,
-            inputs.public.exit_account,
+            inputs.private.unspendable_account,
             inputs.public.funding_amount,
         )
     }

@@ -73,14 +73,6 @@ impl From<BytesDigest> for SubstrateAccount {
     }
 }
 
-impl TryFrom<&CircuitInputs> for SubstrateAccount {
-    type Error = anyhow::Error;
-
-    fn try_from(inputs: &CircuitInputs) -> Result<Self, Self::Error> {
-        Self::from_bytes(inputs.public.exit_account.as_slice())
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct ExitAccountTargets {
     pub address: HashOutTarget,
