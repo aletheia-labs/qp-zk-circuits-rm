@@ -14,7 +14,8 @@ const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config()
 fn verify_simple_proof() {
     let prover = WormholeProver::new(CIRCUIT_CONFIG);
     let inputs = CircuitInputs::test_inputs();
-    let proof = prover.commit(&inputs).unwrap().prove().unwrap();
+    let commitment = prover.commit(&inputs).unwrap();
+    let proof = commitment.prove().unwrap();
 
     let verifier = WormholeVerifier::new(CIRCUIT_CONFIG, None);
     verifier.verify(proof).unwrap();

@@ -125,5 +125,11 @@ pub mod circuit_logic {
             targets.storage_proof.leaf_inputs.transfer_count,
             targets.nullifier.transfer_count,
         );
+
+        // to_account and unspendable_account must be the same
+        builder.connect_hashes(
+            targets.unspendable_account.account_id,
+            targets.storage_proof.leaf_inputs.to_account,
+        );
     }
 }

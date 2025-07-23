@@ -148,7 +148,7 @@ impl From<&CircuitInputs> for UnspendableAccount {
 
 #[derive(Debug, Clone)]
 pub struct UnspendableAccountTargets {
-    account_id: HashOutTarget,
+    pub account_id: HashOutTarget,
     pub secret: Vec<Target>,
 }
 
