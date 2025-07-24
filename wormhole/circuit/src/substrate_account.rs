@@ -8,7 +8,7 @@ use zk_circuits_common::circuit::CircuitFragment;
 
 use crate::{
     codec::{ByteCodec, FieldElementCodec},
-    inputs::{BytesDigest, CircuitInputs},
+    inputs::BytesDigest,
 };
 use plonky2::{
     hash::hash_types::HashOutTarget, iop::witness::WitnessWrite,

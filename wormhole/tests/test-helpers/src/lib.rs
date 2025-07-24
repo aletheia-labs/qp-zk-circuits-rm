@@ -1,9 +1,15 @@
 use crate::storage_proof::{DEFAULT_ROOT_HASH, TestInputs};
+use plonky2::{field::types::Field, hash::poseidon::PoseidonHash, plonk::config::Hasher};
 use wormhole_circuit::{
     inputs::{BytesDigest, CircuitInputs, PrivateCircuitInputs, PublicCircuitInputs},
     nullifier::Nullifier,
     storage_proof::ProcessedStorageProof,
+    substrate_account::SubstrateAccount,
     unspendable_account::UnspendableAccount,
+};
+use zk_circuits_common::{
+    circuit::F,
+    utils::{felts_to_bytes, u128_to_felts},
 };
 
 pub const DEFAULT_SECRET: &str = "9aa84f99ef2de22e3070394176868df41d6a148117a36132d010529e19b018b7";
@@ -54,6 +60,44 @@ impl TestInputs for CircuitInputs {
             },
         }
     }
+
+    fn test_inputs_empty_storage_proof() -> Self {
+        let secret = hex::decode(DEFAULT_SECRET.trim()).unwrap();
+
+        let funding_account = SubstrateAccount::new(&DEFAULT_FUNDING_ACCOUNT).unwrap();
+        let nullifier = Nullifier::from_preimage(&secret, DEFAULT_TRANSFER_COUNT)
+            .hash
+            .into();
+        let unspendable_account = UnspendableAccount::from_secret(&secret).account_id;
+        let mut leaf_inputs_felts = Vec::new();
+        leaf_inputs_felts.push(F::from_noncanonical_u64(DEFAULT_TRANSFER_COUNT));
+        leaf_inputs_felts.extend_from_slice(&funding_account.0);
+        leaf_inputs_felts.extend_from_slice(&unspendable_account);
+        leaf_inputs_felts.extend_from_slice(&u128_to_felts(DEFAULT_FUNDING_AMOUNT));
+
+        let leaf_inputs_hash = PoseidonHash::hash_no_pad(&leaf_inputs_felts);
+        let root_hash: [u8; 32] = felts_to_bytes(&leaf_inputs_hash.elements)
+            .try_into()
+            .unwrap();
+        let exit_account = BytesDigest::from(DEFAULT_EXIT_ACCOUNT);
+
+        let storage_proof = ProcessedStorageProof::test_inputs_empty_storage_proof();
+        Self {
+            public: PublicCircuitInputs {
+                funding_amount: DEFAULT_FUNDING_AMOUNT,
+                nullifier,
+                root_hash: root_hash.into(),
+                exit_account,
+            },
+            private: PrivateCircuitInputs {
+                secret,
+                storage_proof,
+                transfer_count: DEFAULT_TRANSFER_COUNT,
+                funding_account: (*funding_account).into(),
+                unspendable_account: (unspendable_account).into(),
+            },
+        }
+    }
 }
 
 pub mod storage_proof {
@@ -79,6 +123,7 @@ pub mod storage_proof {
 
     pub trait TestInputs {
         fn test_inputs() -> Self;
+        fn test_inputs_empty_storage_proof() -> Self;
     }
 
     impl TestInputs for ProcessedStorageProof {
@@ -88,6 +133,9 @@ pub mod storage_proof {
                 .to_vec();
             let indices = DEFAULT_STORAGE_PROOF_INDICIES.to_vec();
             Self::new(proof, indices).unwrap()
+        }
+        fn test_inputs_empty_storage_proof() -> Self {
+            Self::new(vec![], vec![]).unwrap()
         }
     }
 
@@ -103,6 +151,9 @@ pub mod storage_proof {
             )
             .unwrap()
         }
+        fn test_inputs_empty_storage_proof() -> Self {
+            Self::test_inputs()
+        }
     }
 
     impl TestInputs for StorageProof {
@@ -112,6 +163,9 @@ pub mod storage_proof {
                 default_root_hash(),
                 LeafInputs::test_inputs(),
             )
+        }
+        fn test_inputs_empty_storage_proof() -> Self {
+            unimplemented!() // This function is not used in the current context, so we can leave it unimplemented.
         }
     }
 

@@ -64,10 +64,10 @@ use plonky2::{
 use std::{fs, path::Path};
 
 use wormhole_circuit::circuit::circuit_logic::{CircuitTargets, WormholeCircuit};
+use wormhole_circuit::codec::ByteCodec;
 use wormhole_circuit::nullifier::Nullifier;
 use wormhole_circuit::{inputs::CircuitInputs, substrate_account::SubstrateAccount};
 use wormhole_circuit::{storage_proof::StorageProof, unspendable_account::UnspendableAccount};
-use wormhole_circuit::codec::ByteCodec;
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
 
 #[derive(Debug)]
@@ -214,7 +214,8 @@ impl WormholeProver {
         let nullifier = Nullifier::from(circuit_inputs);
         let storage_proof = StorageProof::try_from(circuit_inputs)?;
         let unspendable_account = UnspendableAccount::from(circuit_inputs);
-        let exit_account = SubstrateAccount::from_bytes(circuit_inputs.public.exit_account.as_slice())?;
+        let exit_account =
+            SubstrateAccount::from_bytes(circuit_inputs.public.exit_account.as_slice())?;
 
         nullifier.fill_targets(&mut self.partial_witness, targets.nullifier)?;
         unspendable_account.fill_targets(&mut self.partial_witness, targets.unspendable_account)?;
