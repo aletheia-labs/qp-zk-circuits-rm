@@ -1,4 +1,6 @@
 #![cfg(test)]
+use std::path::PathBuf;
+
 use wormhole_aggregator::aggregator::WormholeProofAggregator;
 use wormhole_circuit::inputs::CircuitInputs;
 use wormhole_prover::WormholeProver;
@@ -48,19 +50,18 @@ fn aggregate_single_proof() {
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
 
-    // Make sure directory exists
-    std::fs::create_dir_all("../aggregator/data").unwrap();
+    let out_path: PathBuf = [
+        env!("CARGO_MANIFEST_DIR"),
+        "..",
+        "aggregator",
+        "data",
+        "dummy_proof_zk.bin",
+    ]
+    .iter()
+    .collect();
 
-    // Write to ../aggregator/data/dummy_proof_zk.bin if cfg feature = "no_zk" then write to ../aggregator/data/dummy_proof.bin
-    #[cfg(feature = "no_zk")]
-    let out_path = "../aggregator/data/dummy_proof.bin";
-    #[cfg(not(feature = "no_zk"))]
-    let out_path = "../aggregator/data/dummy_proof_zk.bin";
-    println!("Writing dummy proof to: {}", out_path);
-    std::fs::write(out_path, proof.to_bytes()).expect("Failed to write dummy proof");
-
-    // Just a safety check
-    assert!(std::path::Path::new(out_path).exists());
+    std::fs::create_dir_all(out_path.parent().unwrap()).unwrap();
+    std::fs::write(&out_path, proof.to_bytes()).expect("Failed to write dummy proof");
 
     let mut aggregator = WormholeProofAggregator::from_circuit_config(circuit_config());
     aggregator.push_proof(proof).unwrap();
