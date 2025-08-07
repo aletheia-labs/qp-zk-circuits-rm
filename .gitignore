@@ -10,5 +10,6 @@ Cargo.lock
 
 # generated binary files
 /generated-bins
+wormhole/aggregator/data/*.bin
 wormhole/tests/*.bin
 wormhole/tests/*.hex
