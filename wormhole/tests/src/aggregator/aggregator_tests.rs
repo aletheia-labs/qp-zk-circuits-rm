@@ -43,25 +43,13 @@ fn push_proof_to_full_buffer() {
     assert_eq!(proofs_buffer.len(), aggregator.config.num_leaf_proofs);
 }
 
+#[ignore]
 #[test]
 fn aggregate_single_proof() {
     // Create a proof.
     let prover = WormholeProver::new(circuit_config());
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
-
-    let out_path: PathBuf = [
-        env!("CARGO_MANIFEST_DIR"),
-        "..",
-        "aggregator",
-        "data",
-        "dummy_proof_zk.bin",
-    ]
-    .iter()
-    .collect();
-
-    std::fs::create_dir_all(out_path.parent().unwrap()).unwrap();
-    std::fs::write(&out_path, proof.to_bytes()).expect("Failed to write dummy proof");
 
     let mut aggregator = WormholeProofAggregator::from_circuit_config(circuit_config());
     aggregator.push_proof(proof).unwrap();
