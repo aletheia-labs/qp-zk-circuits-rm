@@ -1,12 +1,10 @@
 #![allow(clippy::new_without_default)]
+#[cfg(feature = "std")]
+use crate::storage_proof::ProcessedStorageProof;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-use core::ops::Deref;
-#[cfg(feature = "std")]
-use std::vec::Vec;
-
-use crate::storage_proof::ProcessedStorageProof;
 use anyhow::{anyhow, bail, Context};
+use core::ops::Deref;
 use plonky2::plonk::proof::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 use zk_circuits_common::utils::{felts_to_bytes, felts_to_u128, fixed_felts_to_bytes, Digest};
@@ -100,7 +98,7 @@ pub struct PublicCircuitInputs {
 #[derive(Debug, Clone)]
 pub struct PrivateCircuitInputs {
     /// Raw bytes of the secret of the nullifier and the unspendable account
-    pub secret: Vec<u8>,
+    pub secret: [u8; 32],
     /// A sequence of key-value nodes representing the storage proof.
     ///
     /// Each element is a tuple where the items are the left and right splits of a proof node split

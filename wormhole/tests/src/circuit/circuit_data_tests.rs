@@ -89,7 +89,7 @@ fn test_prover_and_verifier_from_file_e2e() -> Result<()> {
 
     // Create inputs
     let funding_account = SubstrateAccount::new(&[2u8; 32])?;
-    let secret = vec![1u8; 32];
+    let secret = [1u8; 32];
     let unspendable_account = UnspendableAccount::from_secret(&secret).account_id;
     let funding_amount = 1000u128;
     let transfer_count = 0u64;
@@ -108,7 +108,7 @@ fn test_prover_and_verifier_from_file_e2e() -> Result<()> {
     let exit_account = SubstrateAccount::new(&[2u8; 32])?;
     let inputs = CircuitInputs {
         private: PrivateCircuitInputs {
-            secret: secret.clone(),
+            secret,
             funding_account: (*funding_account).into(),
             storage_proof: ProcessedStorageProof::new(vec![], vec![]).unwrap(),
             unspendable_account: (unspendable_account).into(),

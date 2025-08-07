@@ -44,7 +44,7 @@ fn build_and_verify_unspendable_account_proof() {
 #[test]
 fn preimage_matches_right_address() {
     for (secret, address) in SECRETS.iter().zip(ADDRESSES) {
-        let decoded_secret = hex::decode(secret).unwrap();
+        let decoded_secret: [u8; 32] = hex::decode(secret).unwrap().try_into().unwrap();
         let decoded_address = hex::decode(address).unwrap();
         let unspendable_account = UnspendableAccount::from_secret(&decoded_secret);
 
@@ -58,7 +58,7 @@ fn preimage_matches_right_address() {
 #[test]
 fn preimage_does_not_match_wrong_address() {
     let (secret, wrong_address) = (SECRETS[0], ADDRESSES[1]);
-    let decoded_secret = hex::decode(secret).unwrap();
+    let decoded_secret: [u8; 32] = hex::decode(secret).unwrap().try_into().unwrap();
     let mut unspendable_account = UnspendableAccount::from_secret(&decoded_secret);
 
     // Override the correct hash with the wrong one.
@@ -72,7 +72,7 @@ fn preimage_does_not_match_wrong_address() {
 
 #[test]
 fn all_zero_preimage_is_valid_and_hashes() {
-    let preimage_bytes = vec![0u8; 32];
+    let preimage_bytes = [0u8; 32];
     let account = UnspendableAccount::from_secret(&preimage_bytes);
     assert!(!account.account_id.to_vec().iter().all(Field::is_zero));
 }

@@ -12,14 +12,14 @@ const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config()
 #[test]
 fn commit_and_prove() {
     let prover = WormholeProver::new(CIRCUIT_CONFIG);
-    let inputs = CircuitInputs::test_inputs_empty_storage_proof();
+    let inputs = CircuitInputs::test_inputs();
     prover.commit(&inputs).unwrap().prove().unwrap();
 }
 
 #[test]
 fn proof_can_be_deserialized() {
     let prover = WormholeProver::new(CIRCUIT_CONFIG);
-    let inputs = CircuitInputs::test_inputs_empty_storage_proof();
+    let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
     let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
     println!("{:?}", public_inputs);
@@ -28,7 +28,7 @@ fn proof_can_be_deserialized() {
 #[test]
 fn get_public_inputs() {
     let prover = WormholeProver::new(CIRCUIT_CONFIG);
-    let inputs = CircuitInputs::test_inputs_empty_storage_proof();
+    let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
     let public_inputs = proof.public_inputs;
     println!("{:?}", public_inputs);

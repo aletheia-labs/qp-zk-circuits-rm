@@ -23,7 +23,7 @@ use zk_circuits_common::{
 pub mod leaf;
 
 pub const MAX_PROOF_LEN: usize = 20;
-pub const PROOF_NODE_MAX_SIZE_F: usize = 73;
+pub const PROOF_NODE_MAX_SIZE_F: usize = 94; // Should match the felt preimage max set on poseidon-resonance crate.
 pub const PROOF_NODE_MAX_SIZE_B: usize = 256;
 pub const FELTS_PER_AMOUNT: usize = 2;
 
@@ -99,6 +99,11 @@ impl StorageProof {
             .iter()
             .map(|node| bytes_to_felts(node))
             .collect();
+        // print the length of the proof at index 4
+        // println!(
+        //     "[+] StorageProof: proof length at index 4: {}",
+        //     proof.get(4).map_or(0, |node| node.len())
+        // );
 
         let indices = processed_proof
             .indices
@@ -225,6 +230,14 @@ impl CircuitFragment for StorageProof {
             match self.proof.get(i) {
                 Some(node) => {
                     let mut padded_proof_node = node.clone();
+                    // if padded_proof_node is greater than PROOF_NODE_MAX_SIZE_F, we throw an error
+                    if padded_proof_node.len() > PROOF_NODE_MAX_SIZE_F {
+                        bail!(
+                            "proof node at index {} is too large: {}",
+                            i,
+                            padded_proof_node.len()
+                        );
+                    }
                     padded_proof_node.resize(PROOF_NODE_MAX_SIZE_F, F::ZERO);
                     pw.set_target_arr(&targets.proof_data[i], &padded_proof_node)?;
                 }
