@@ -1,5 +1,4 @@
 #![cfg(test)]
-use std::path::PathBuf;
 
 use wormhole_aggregator::aggregator::WormholeProofAggregator;
 use wormhole_circuit::inputs::CircuitInputs;
