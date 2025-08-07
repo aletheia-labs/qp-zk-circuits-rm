@@ -7,62 +7,36 @@ on:
     branches: [ "main" ]
 
 jobs:
-  format:
-    name: Format code
+  basics:
+    name: Checks
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-      - name: Run rustfmt
-        run: cargo fmt --check
+    strategy:
+      fail-fast: false
+      matrix:
+        steps:
+          - name: Format code
+            run: cargo fmt --check
 
-  clippy:
-    name: Clippy lints
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: Run clippy
-        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+          - name: Clippy lints
+            run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
-  generate-dummy-proof:
-    name: Generate Dummy Proof
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
-      - name: Build project
-        run: cargo build --release
-      - name: Generate dummy proof
-        run: cargo run -p wormhole-aggregator --bin generate_dummy_proofs
-      - name: Upload dummy proof
-        uses: actions/upload-artifact@v4
-        with:
-          name: dummy-proof
-          path: wormhole/aggregator/data/dummy_proof_zk.bin
+          - name: Build project
+            run: cargo build --release
 
+          - name: Run tests
+            run: cargo test --release --all-features
 
-  test:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    needs: [format, clippy, generate-dummy-proof]
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - uses: Swatinem/rust-cache@v2
-      - name: Remove committed dummy proof
-        run: rm -f wormhole/aggregator/data/dummy_proof_zk.bin
-      - name: Download dummy proof
-        uses: actions/download-artifact@v4
-        with:
-          name: dummy-proof
-          path: wormhole/aggregator/data
-      - name: Run tests
-        run: cargo test --release --all-features
+    - uses: actions/checkout@v4
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: "clippy, rustfmt"
+
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+
+    - name: ${{ matrix.steps.name }}
+      run: ${{ matrix.steps.run }}
+

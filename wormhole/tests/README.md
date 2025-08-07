@@ -4,12 +4,6 @@ This is the dedicated crate for all tests and benchmarks in the Wormhole Circuit
 
 ## Running Tests
 
-Before running the tests, we recommend updating the dummy proofs by running.
-```bash
-cargo run -p wormhole-aggregator --bin generate_dummy_proofs
-```
-The reason being is that serialization of the dummy proofs is not agnostic to chip architecutre, so we need to generate them on the same architecture as the one running the tests.
-
 
 To run all tests:
 ```bash

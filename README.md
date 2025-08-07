@@ -61,7 +61,6 @@ cargo build
 Run the entire test suite:
 
 ```sh
-cargo run -p wormhole-aggregator --bin generate_dummy_proofs
 cargo test
 ```
 
