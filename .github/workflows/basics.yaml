@@ -7,39 +7,49 @@ on:
     branches: [ "main" ]
 
 jobs:
-  basics:
-    name: Checks
+  format:
+    name: Format code
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        steps:
-          - name: Format code
-            run: cargo fmt --check
-
-          - name: Clippy lints
-            run: cargo clippy --workspace --all-features --all-targets -- -D warnings
-
-          - name: Build project
-            run: cargo build --release
-          
-          - name: Generate dummy proof
-            run: cargo run -p wormhole-aggregator --bin generate_dummy_proofs
-
-          - name: Run tests
-            run: cargo test --release --all-features
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Run rustfmt
+        run: cargo fmt --check
 
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        components: "clippy, rustfmt"
+  clippy:
+    name: Clippy lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy
+        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
 
-    - name: Cache dependencies
-      uses: Swatinem/rust-cache@v2
+  generate-dummy-proof:
+    name: Generate Dummy Proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Build project
+        run: cargo build --release
+      - name: Generate dummy proof
+        run: cargo run -p wormhole-aggregator --bin generate_dummy_proofs
 
-    - name: ${{ matrix.steps.name }}
-      run: ${{ matrix.steps.run }}
-
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: [format, clippy, generate-dummy-proof]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: cargo test --release --all-features
