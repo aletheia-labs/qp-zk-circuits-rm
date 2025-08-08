@@ -12,3 +12,5 @@ Cargo.lock
 /generated-bins
 wormhole/tests/*.bin
 wormhole/tests/*.hex
+.env.qac
+*.json
