@@ -42,7 +42,6 @@ fn push_proof_to_full_buffer() {
     assert_eq!(proofs_buffer.len(), aggregator.config.num_leaf_proofs);
 }
 
-#[ignore]
 #[test]
 fn aggregate_single_proof() {
     // Create a proof.
