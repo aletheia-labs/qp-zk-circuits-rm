@@ -27,7 +27,7 @@
 //! // Create inputs. In practice, each input would be gathered from the real node.
 //! let inputs = CircuitInputs {
 //!     private: PrivateCircuitInputs {
-//!         secret: vec![1u8; 32],
+//!         secret: [1u8; 32],
 //!         transfer_count: 0,
 //!         funding_account: [2u8; 32].into(),
 //!         storage_proof: ProcessedStorageProof::new(vec![], vec![]).unwrap(),

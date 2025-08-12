@@ -12,3 +12,7 @@ Cargo.lock
 /generated-bins
 wormhole/tests/*.bin
 wormhole/tests/*.hex
+
+# wormhole fuzzing files
+.env.qac
+transfer_proof.json

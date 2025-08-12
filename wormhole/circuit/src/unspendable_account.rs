@@ -38,7 +38,7 @@ impl UnspendableAccount {
         Self { account_id, secret }
     }
 
-    pub fn from_secret(secret: &[u8]) -> Self {
+    pub fn from_secret(secret: &[u8; 32]) -> Self {
         // First, convert the preimage to its representation as field elements.
         let mut preimage = Vec::new();
         let secret_felts = bytes_to_felts(secret);
@@ -148,7 +148,7 @@ impl From<&CircuitInputs> for UnspendableAccount {
 
 #[derive(Debug, Clone)]
 pub struct UnspendableAccountTargets {
-    account_id: HashOutTarget,
+    pub account_id: HashOutTarget,
     pub secret: Vec<Target>,
 }
 
@@ -205,6 +205,7 @@ impl Default for UnspendableAccount {
         let preimage =
             hex::decode("cd94df2e3c38a87f3e429b62af022dbe4363143811219d80037e8798b2ec9229")
                 .unwrap();
+        let preimage: [u8; 32] = preimage.try_into().expect("Expected 32 bytes for preimage");
         Self::from_secret(&preimage)
     }
 }

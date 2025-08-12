@@ -8,7 +8,7 @@ use zk_circuits_common::circuit::CircuitFragment;
 
 use crate::{
     codec::{ByteCodec, FieldElementCodec},
-    inputs::{BytesDigest, CircuitInputs},
+    inputs::BytesDigest,
 };
 use plonky2::{
     hash::hash_types::HashOutTarget, iop::witness::WitnessWrite,
@@ -70,14 +70,6 @@ impl From<BytesDigest> for SubstrateAccount {
     fn from(value: BytesDigest) -> Self {
         let felts = fixed_bytes_to_felts(*value);
         SubstrateAccount(felts)
-    }
-}
-
-impl TryFrom<&CircuitInputs> for SubstrateAccount {
-    type Error = anyhow::Error;
-
-    fn try_from(inputs: &CircuitInputs) -> Result<Self, Self::Error> {
-        Self::from_bytes(inputs.public.exit_account.as_slice())
     }
 }
 
