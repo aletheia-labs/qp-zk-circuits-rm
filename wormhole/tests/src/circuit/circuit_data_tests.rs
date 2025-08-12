@@ -1,5 +1,5 @@
+use anyhow::Context;
 use anyhow::Result;
-use anyhow::{bail, Context};
 use plonky2::field::types::Field;
 use plonky2::hash::poseidon::PoseidonHash;
 use plonky2::plonk::circuit_data::CircuitConfig;
@@ -7,10 +7,9 @@ use plonky2::plonk::config::{Hasher, PoseidonGoldilocksConfig};
 use plonky2::util::serialization::{DefaultGateSerializer, DefaultGeneratorSerializer};
 use rand::RngCore;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, fs};
 use wormhole_circuit::circuit::circuit_logic::WormholeCircuit;
 use wormhole_circuit::circuit::{circuit_data_from_bytes, circuit_data_to_bytes};
 use wormhole_circuit::inputs::{CircuitInputs, PrivateCircuitInputs, PublicCircuitInputs};
@@ -20,15 +19,8 @@ use wormhole_circuit::substrate_account::SubstrateAccount;
 use wormhole_circuit::unspendable_account::UnspendableAccount;
 use wormhole_prover::WormholeProver;
 use wormhole_verifier::WormholeVerifier;
-use zk_circuits_common::circuit::{D, F};
+use zk_circuits_common::circuit::{TransferProofJson, D, F};
 use zk_circuits_common::utils::{felts_to_bytes, u128_to_felts};
-#[derive(Debug, Deserialize)]
-struct TransferProofJson {
-    transfer_count: u64,
-    state_root: String,         // hex (no 0x)
-    storage_proof: Vec<String>, // hex-encoded nodes
-    indices: Vec<usize>,
-}
 
 /// Extract the last valid JSON object of type T from an arbitrary stdout blob.
 /// Robust against extra logs before/after the JSON.
@@ -51,33 +43,26 @@ fn extract_last_json<T: DeserializeOwned>(s: &str) -> Result<T> {
 }
 
 fn run_remote_example(secret_hex: &str, amount: u128) -> Result<TransferProofJson> {
-    // Adjust this path relative to your tests crate:
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../third_party/quantus-api-client/examples/async/Cargo.toml");
+    let example_dir = PathBuf::from(env::var("QUANTUS_API_CLIENT_EXAMPLE_DIR").context(
+        "QUANTUS_API_CLIENT_EXAMPLE_DIR not set; run `setup_qac.sh` and `source .env.qac`",
+    )?);
 
     let output = Command::new("cargo")
         .args([
             "run",
             "--release",
-            "--manifest-path",
-            manifest.to_str().unwrap(),
             "--example",
             "sample_proof",
             "--",
             secret_hex,
             &amount.to_string(),
         ])
+        .current_dir(&example_dir)
         .output()
-        .context("failed to run example")?;
+        .context("failed to run remote example")?;
 
-    if !output.status.success() {
-        bail!(
-            "example failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    // parse JSON from stdout (use your extract_last_json if you have logs)
     let stdout = String::from_utf8(output.stdout).context("stdout not UTF-8")?;
-    // If stdout contains logs before/after the JSON, use the “extract last JSON” helper you already added.
     let parsed: TransferProofJson =
         serde_json::from_str(&stdout).or_else(|_| extract_last_json(&stdout))?;
     Ok(parsed)

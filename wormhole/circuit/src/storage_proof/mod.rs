@@ -230,7 +230,7 @@ impl CircuitFragment for StorageProof {
             match self.proof.get(i) {
                 Some(node) => {
                     let mut padded_proof_node = node.clone();
-                    // if padded_proof_node is greater than PROOF_NODE_MAX_SIZE_F, we throw an error
+
                     if padded_proof_node.len() > PROOF_NODE_MAX_SIZE_F {
                         bail!(
                             "proof node at index {} is too large: {}",

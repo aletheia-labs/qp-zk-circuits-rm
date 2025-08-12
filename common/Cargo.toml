@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 anyhow = { workspace = true, default-features = false }
 plonky2 = { workspace = true, default-features = false }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 [features]
 default = ["std"]
