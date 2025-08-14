@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use wormhole_aggregator::aggregator::WormholeProofAggregator;
-use wormhole_circuit::inputs::CircuitInputs;
+use wormhole_circuit::inputs::{CircuitInputs, PublicCircuitInputs};
 use wormhole_prover::WormholeProver;
 
 use crate::aggregator::circuit_config;
@@ -63,6 +63,9 @@ fn aggregate_proofs_into_tree() {
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
 
+    let public_inputs = PublicCircuitInputs::try_from(proof.clone()).unwrap();
+    println!("public inputs of original proof = {:?}", public_inputs);
+
     let mut aggregator = WormholeProofAggregator::from_circuit_config(circuit_config());
 
     // Fill up the proof buffer.
@@ -70,7 +73,20 @@ fn aggregate_proofs_into_tree() {
         aggregator.push_proof(proof.clone()).unwrap();
     }
 
-    let aggregated_proof = aggregator.aggregate().unwrap();
+    let aggregated_proof = aggregator.aggregate().unwrap(); // AggregatedProof<F, C, D>
+
+    // Extract *all* leaf public inputs from the aggregated proof
+    let all_leaf_pis = aggregator
+        .extract_leaf_public_inputs(&aggregated_proof.proof)
+        .unwrap();
+
+    let first_leaf_pi = &all_leaf_pis[0];
+    println!("first leaf PI = {:?}", first_leaf_pi);
+    // Check that the first leaf public inputs match the original proof's public inputs
+    assert_eq!(first_leaf_pi, &public_inputs);
+    // Check that the last leaf public inputs match the original proof's public inputs
+    let last_leaf_pi = &all_leaf_pis[aggregator.config.num_leaf_proofs - 1];
+    assert_eq!(last_leaf_pi, &public_inputs);
     aggregated_proof
         .circuit_data
         .verify(aggregated_proof.proof)

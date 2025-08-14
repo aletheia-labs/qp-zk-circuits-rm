@@ -5,6 +5,7 @@ use crate::storage_proof::ProcessedStorageProof;
 use alloc::vec::Vec;
 use anyhow::{anyhow, bail, Context};
 use core::ops::Deref;
+use plonky2::field::goldilocks_field::GoldilocksField;
 use plonky2::plonk::proof::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 use zk_circuits_common::utils::{felts_to_bytes, felts_to_u128, fixed_felts_to_bytes, Digest};
@@ -13,17 +14,17 @@ use zk_circuits_common::utils::{felts_to_bytes, felts_to_u128, fixed_felts_to_by
 pub const PUBLIC_INPUTS_FELTS_LEN: usize = 14;
 pub const NULLIFIER_START_INDEX: usize = 0;
 pub const NULLIFIER_END_INDEX: usize = 4;
-pub const FUNDING_AMOUNT_START_INDEX: usize = 4;
-pub const FUNDING_AMOUNT_END_INDEX: usize = 6;
-pub const ROOT_HASH_START_INDEX: usize = 6;
-pub const ROOT_HASH_END_INDEX: usize = 10;
+pub const ROOT_HASH_START_INDEX: usize = 4;
+pub const ROOT_HASH_END_INDEX: usize = 8;
+pub const FUNDING_AMOUNT_START_INDEX: usize = 8;
+pub const FUNDING_AMOUNT_END_INDEX: usize = 10;
 pub const EXIT_ACCOUNT_START_INDEX: usize = 10;
 pub const EXIT_ACCOUNT_END_INDEX: usize = 14;
 
 /// A bytes digest containing various helpful methods for converting between
 /// field element digests and byte digests.
-#[derive(Default, Debug, Clone, Copy)]
-pub struct BytesDigest([u8; 32]);
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BytesDigest(pub [u8; 32]);
 
 impl From<[u8; 32]> for BytesDigest {
     fn from(value: [u8; 32]) -> Self {
@@ -82,7 +83,7 @@ pub struct CircuitInputs {
 }
 
 /// All of the public inputs required for the circuit.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicCircuitInputs {
     /// Amount to be withdrawn.
     pub funding_amount: u128,
@@ -110,40 +111,55 @@ pub struct PrivateCircuitInputs {
     pub unspendable_account: BytesDigest,
 }
 
-impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
-    type Error = anyhow::Error;
+impl PublicCircuitInputs {
+    /// Parse a vector of `PublicCircuitInputs` from a *root aggregated* proof.
+    /// `leaf_pi_len` should match the leaf circuit's public input length.
+    /// `num_leaves` should match `TreeAggregationConfig.num_leaf_proofs`.
+    pub fn try_from_aggregated(
+        aggr: &ProofWithPublicInputs<F, C, D>,
+        leaf_pi_len: usize,
+        num_leaves: usize,
+    ) -> anyhow::Result<Vec<Self>> {
+        let pis = &aggr.public_inputs;
+        let expected = leaf_pi_len * num_leaves;
 
-    fn try_from(proof: ProofWithPublicInputs<F, C, D>) -> Result<Self, Self::Error> {
-        let public_inputs = proof.public_inputs;
-
-        // Public inputs are ordered as follows:
-        // Nullifier.hash: 4 felts
-        // StorageProof.funding_amount: 2 felts
-        // StorageProof.root_hash: 4 felts
-        // ExitAccount.address: 4 felts
-        if public_inputs.len() != PUBLIC_INPUTS_FELTS_LEN {
-            bail!(
-                "public inputs should contain: {} field elements, got: {}",
-                PUBLIC_INPUTS_FELTS_LEN,
-                public_inputs.len()
-            )
+        if pis.len() != expected {
+            anyhow::bail!(
+                "aggregated public inputs should contain: {} (= {} leaves × {} fields), got: {}",
+                expected,
+                num_leaves,
+                leaf_pi_len,
+                pis.len()
+            );
         }
 
-        let nullifier =
-            BytesDigest::try_from(&public_inputs[NULLIFIER_START_INDEX..NULLIFIER_END_INDEX])
-                .context("failed to deserialize nullifier hash")?;
-        let funding_amount = felts_to_u128(
-            <[F; 2]>::try_from(
-                &public_inputs[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX],
-            )
-            .context("failed to deserialize funding amount")?,
-        );
-        let root_hash =
-            BytesDigest::try_from(&public_inputs[ROOT_HASH_START_INDEX..ROOT_HASH_END_INDEX])
-                .context("failed to deserialize root hash")?;
+        pis.chunks(leaf_pi_len).map(Self::try_from_slice).collect()
+    }
 
+    pub fn try_from_slice(pis: &[GoldilocksField]) -> anyhow::Result<Self> {
+        const LEAF_PI_LEN: usize = 14;
+        // Public inputs are ordered as follows:
+        // Nullifier.hash: 4 felts
+        // StorageProof.root_hash: 4 felts
+        // StorageProof.funding_amount: 2 felts
+        // ExitAccount.address: 4 felts
+        if pis.len() != LEAF_PI_LEN {
+            bail!(
+                "public inputs should contain: {} field elements, got: {}",
+                LEAF_PI_LEN,
+                pis.len()
+            )
+        }
+        let nullifier = BytesDigest::try_from(&pis[NULLIFIER_START_INDEX..NULLIFIER_END_INDEX])
+            .context("failed to deserialize nullifier hash")?;
+        let root_hash = BytesDigest::try_from(&pis[ROOT_HASH_START_INDEX..ROOT_HASH_END_INDEX])
+            .context("failed to deserialize root hash")?;
+        let funding_amount = felts_to_u128(
+            <[F; 2]>::try_from(&pis[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX])
+                .context("failed to deserialize funding amount")?,
+        );
         let exit_account =
-            BytesDigest::try_from(&public_inputs[EXIT_ACCOUNT_START_INDEX..EXIT_ACCOUNT_END_INDEX])
+            BytesDigest::try_from(&pis[EXIT_ACCOUNT_START_INDEX..EXIT_ACCOUNT_END_INDEX])
                 .context("failed to deserialize exit account")?;
 
         Ok(PublicCircuitInputs {
@@ -152,5 +168,15 @@ impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
             root_hash,
             exit_account,
         })
+    }
+}
+
+impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
+    type Error = anyhow::Error;
+
+    fn try_from(proof: ProofWithPublicInputs<F, C, D>) -> Result<Self, Self::Error> {
+        let public_inputs = proof.public_inputs;
+        Self::try_from_slice(&public_inputs)
+            .context("failed to deserialize public inputs from proof")
     }
 }
