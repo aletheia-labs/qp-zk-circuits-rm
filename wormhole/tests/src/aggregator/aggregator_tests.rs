@@ -76,17 +76,14 @@ fn aggregate_proofs_into_tree() {
     let aggregated_proof = aggregator.aggregate().unwrap(); // AggregatedProof<F, C, D>
 
     // Extract *all* leaf public inputs from the aggregated proof
-    let all_leaf_pis = aggregator
+    let all_leaf_public_inputs = aggregator
         .extract_leaf_public_inputs(&aggregated_proof.proof)
         .unwrap();
 
-    let first_leaf_pi = &all_leaf_pis[0];
-    println!("first leaf PI = {:?}", first_leaf_pi);
-    // Check that the first leaf public inputs match the original proof's public inputs
-    assert_eq!(first_leaf_pi, &public_inputs);
-    // Check that the last leaf public inputs match the original proof's public inputs
-    let last_leaf_pi = &all_leaf_pis[aggregator.config.num_leaf_proofs - 1];
-    assert_eq!(last_leaf_pi, &public_inputs);
+    // Iterate through all the leaf public inputs and check that they match the original proof's public inputs
+    for leaf_public_inputs in &all_leaf_public_inputs {
+        assert_eq!(leaf_public_inputs, &public_inputs);
+    }
     aggregated_proof
         .circuit_data
         .verify(aggregated_proof.proof)

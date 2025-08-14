@@ -120,20 +120,23 @@ impl PublicCircuitInputs {
         leaf_pi_len: usize,
         num_leaves: usize,
     ) -> anyhow::Result<Vec<Self>> {
-        let pis = &aggr.public_inputs;
+        let leaf_public_inputs = &aggr.public_inputs;
         let expected = leaf_pi_len * num_leaves;
 
-        if pis.len() != expected {
+        if leaf_public_inputs.len() != expected {
             anyhow::bail!(
                 "aggregated public inputs should contain: {} (= {} leaves × {} fields), got: {}",
                 expected,
                 num_leaves,
                 leaf_pi_len,
-                pis.len()
+                leaf_public_inputs.len()
             );
         }
 
-        pis.chunks(leaf_pi_len).map(Self::try_from_slice).collect()
+        leaf_public_inputs
+            .chunks(leaf_pi_len)
+            .map(Self::try_from_slice)
+            .collect()
     }
 
     pub fn try_from_slice(pis: &[GoldilocksField]) -> anyhow::Result<Self> {
