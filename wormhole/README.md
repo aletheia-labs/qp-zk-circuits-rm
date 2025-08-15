@@ -17,7 +17,7 @@ Provides a Zero-Knowledge circuit that can verify wormhole transactions.
 
 - `secret`: A confidential, randomly generated value unique to the prover, often serving as a primary secret for deriving other transaction components.
 - `storage_proof`: A storage proof of a Merkle Patricia trie proving inclusion of the transaction event.
-- `funding_nonce`: A unique, random number used in conjunction with the secret and funding_account to derive the nullifier.
+- `transfer_count`: A globally unique ID for a transfer. Gets incremented with each transfer, ensuring that each transaction is unique.
 - `funding_account`: The private key or identifier associated with the source of the funds, used to derive the nullifier and confirm ownership.
 - `unspendable_account`: A private identifier derived from the secret that, when hashed, provides a verifiable unspendable (burn) address.
 
@@ -27,7 +27,7 @@ Provides a Zero-Knowledge circuit that can verify wormhole transactions.
 
 1. **Nullifier Derivation:**
 
-- Computes `H(H(salt || secret || funding_nonce || funding_account))`.
+- Computes `H(H(salt || secret || transfer_count))`.
 - Compares the derived value against the provided `nullifier` public input.
 
 2. **Unspendable Account Derivation:**

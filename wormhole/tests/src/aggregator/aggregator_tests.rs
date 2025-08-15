@@ -63,7 +63,7 @@ fn aggregate_proofs_into_tree() {
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
 
-    let public_inputs = PublicCircuitInputs::try_from(proof.clone()).unwrap();
+    let public_inputs = PublicCircuitInputs::try_from(&proof).unwrap();
     println!("public inputs of original proof = {:?}", public_inputs);
 
     let mut aggregator = WormholeProofAggregator::from_circuit_config(circuit_config());

@@ -22,7 +22,7 @@ fn proof_can_be_deserialized() {
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
 
-    let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
+    let public_inputs = PublicCircuitInputs::try_from(&proof).unwrap();
 
     // Build the expected values
     let expected = PublicCircuitInputs {

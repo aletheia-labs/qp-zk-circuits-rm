@@ -121,7 +121,13 @@ impl PublicCircuitInputs {
         num_leaves: usize,
     ) -> anyhow::Result<Vec<Self>> {
         let leaf_public_inputs = &aggr.public_inputs;
-        let expected = leaf_pi_len * num_leaves;
+        let expected = leaf_pi_len.checked_mul(num_leaves).ok_or_else(|| {
+            anyhow::anyhow!(
+                "overflow computing expected public inputs (leaf_pi_len={}, num_leaves={})",
+                leaf_pi_len,
+                num_leaves
+            )
+        })?;
 
         if leaf_public_inputs.len() != expected {
             anyhow::bail!(
@@ -174,12 +180,11 @@ impl PublicCircuitInputs {
     }
 }
 
-impl TryFrom<ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
+impl TryFrom<&ProofWithPublicInputs<F, C, D>> for PublicCircuitInputs {
     type Error = anyhow::Error;
 
-    fn try_from(proof: ProofWithPublicInputs<F, C, D>) -> Result<Self, Self::Error> {
-        let public_inputs = proof.public_inputs;
-        Self::try_from_slice(&public_inputs)
+    fn try_from(proof: &ProofWithPublicInputs<F, C, D>) -> Result<Self, Self::Error> {
+        Self::try_from_slice(&proof.public_inputs)
             .context("failed to deserialize public inputs from proof")
     }
 }
