@@ -3,7 +3,7 @@ use std::fs;
 use hex;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use test_helpers::storage_proof::TestInputs;
-use wormhole_circuit::inputs::{CircuitInputs, PublicCircuitInputs};
+use wormhole_circuit::inputs::{BytesDigest, CircuitInputs, PublicCircuitInputs};
 use wormhole_prover::WormholeProver;
 
 #[cfg(test)]
@@ -21,7 +21,23 @@ fn proof_can_be_deserialized() {
     let prover = WormholeProver::new(CIRCUIT_CONFIG);
     let inputs = CircuitInputs::test_inputs();
     let proof = prover.commit(&inputs).unwrap().prove().unwrap();
-    let public_inputs = PublicCircuitInputs::try_from(proof).unwrap();
+
+    let public_inputs = PublicCircuitInputs::try_from(&proof).unwrap();
+
+    // Build the expected values
+    let expected = PublicCircuitInputs {
+        funding_amount: 1_000_000_000u128,
+        nullifier: BytesDigest::from([
+            249, 127, 221, 83, 83, 197, 114, 93, 66, 94, 28, 161, 47, 60, 137, 88, 208, 169, 200,
+            58, 68, 128, 22, 53, 141, 132, 162, 150, 245, 21, 126, 118,
+        ]),
+        root_hash: BytesDigest::from([
+            220, 71, 72, 39, 216, 197, 157, 79, 168, 106, 141, 198, 230, 2, 162, 76, 154, 30, 81,
+            14, 215, 106, 199, 192, 94, 231, 216, 32, 208, 230, 111, 164,
+        ]),
+        exit_account: BytesDigest::from([4u8; 32]),
+    };
+    assert_eq!(public_inputs, expected);
     println!("{:?}", public_inputs);
 }
 

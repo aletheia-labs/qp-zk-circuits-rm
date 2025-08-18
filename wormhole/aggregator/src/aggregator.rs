@@ -1,5 +1,6 @@
 use anyhow::bail;
 use plonky2::plonk::circuit_data::{CircuitConfig, VerifierCircuitData};
+use wormhole_circuit::inputs::PublicCircuitInputs;
 use wormhole_verifier::{ProofWithPublicInputs, WormholeVerifier};
 use zk_circuits_common::circuit::{C, D, F};
 
@@ -58,6 +59,15 @@ impl WormholeProofAggregator {
         }
 
         Ok(())
+    }
+
+    pub fn extract_leaf_public_inputs(
+        &self,
+        aggr: &wormhole_verifier::ProofWithPublicInputs<F, C, D>,
+    ) -> anyhow::Result<Vec<PublicCircuitInputs>> {
+        let leaf_pi_len = self.leaf_circuit_data.common.num_public_inputs;
+        let num_leaves = self.config.num_leaf_proofs;
+        PublicCircuitInputs::try_from_aggregated(aggr, leaf_pi_len, num_leaves)
     }
 
     /// Aggregates `N` number of leaf proofs into an [`AggregatedProof`].
