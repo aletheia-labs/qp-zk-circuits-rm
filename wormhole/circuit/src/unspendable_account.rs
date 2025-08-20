@@ -13,12 +13,12 @@ use plonky2::{
     plonk::{circuit_builder::CircuitBuilder, config::Hasher},
 };
 
+use crate::codec::FieldElementCodec;
 use crate::{codec::ByteCodec, inputs::CircuitInputs};
-use crate::{codec::FieldElementCodec, inputs::BytesDigest};
-use zk_circuits_common::utils::{bytes_to_felts, felts_to_bytes, string_to_felt, Digest};
-use zk_circuits_common::{
-    circuit::{CircuitFragment, D, F},
-    utils::fixed_bytes_to_felts,
+use zk_circuits_common::circuit::{CircuitFragment, D, F};
+use zk_circuits_common::utils::{
+    digest_bytes_to_felts, digest_felts_to_bytes, injective_bytes_to_felts,
+    injective_felts_to_bytes, injective_string_to_felt, BytesDigest, Digest,
 };
 
 pub const SECRET_NUM_TARGETS: usize = 4;
@@ -33,21 +33,21 @@ pub struct UnspendableAccount {
 
 impl UnspendableAccount {
     pub fn new(account_id: BytesDigest, secret: &[u8]) -> Self {
-        let account_id = fixed_bytes_to_felts(*account_id);
-        let secret = bytes_to_felts(secret);
+        let account_id = digest_bytes_to_felts(account_id);
+        let secret = injective_bytes_to_felts(secret);
         Self { account_id, secret }
     }
 
     pub fn from_secret(secret: &[u8; 32]) -> Self {
         // First, convert the preimage to its representation as field elements.
         let mut preimage = Vec::new();
-        let secret_felts = bytes_to_felts(secret);
-        preimage.push(string_to_felt(UNSPENDABLE_SALT));
+        let secret_felts = injective_bytes_to_felts(secret);
+        preimage.extend(injective_string_to_felt(UNSPENDABLE_SALT));
         preimage.extend(secret_felts.clone());
 
         if preimage.len() != PREIMAGE_NUM_TARGETS {
             panic!(
-                "Expected secret to be 32 bytes (4 field elements), got {} field elements",
+                "Expected secret to be 80 bytes (10 field elements), got {} field elements",
                 preimage.len() - 1
             );
         }
@@ -68,15 +68,15 @@ impl UnspendableAccount {
 impl ByteCodec for UnspendableAccount {
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
-        bytes.extend(felts_to_bytes(&self.account_id));
-        bytes.extend(felts_to_bytes(&self.secret));
+        bytes.extend(*digest_felts_to_bytes(self.account_id));
+        bytes.extend(injective_felts_to_bytes(&self.secret));
         bytes
     }
 
     fn from_bytes(slice: &[u8]) -> anyhow::Result<Self> {
         let f_size = size_of::<F>(); // 8 bytes
         let account_id_size = 4 * f_size; // 4 field elements
-        let preimage_size = 5 * f_size; // 5 field elements
+        let preimage_size = 10 * f_size; // 10 field elements
         let total_size = account_id_size + preimage_size;
 
         if slice.len() != total_size {
@@ -89,13 +89,14 @@ impl ByteCodec for UnspendableAccount {
 
         let mut offset = 0;
         // Deserialize account_id
-        let account_id = bytes_to_felts(&slice[offset..offset + account_id_size])
+        let account_id_bytes: BytesDigest = slice[offset..offset + account_id_size]
             .try_into()
             .map_err(|_| anyhow::anyhow!("Failed to deserialize unspendable account id"))?;
+        let account_id = digest_bytes_to_felts(account_id_bytes);
         offset += account_id_size;
 
         // Deserialize preimage
-        let preimage = bytes_to_felts(&slice[offset..offset + preimage_size]);
+        let preimage = injective_bytes_to_felts(&slice[offset..offset + preimage_size]);
 
         Ok(Self {
             account_id,
@@ -115,7 +116,7 @@ impl FieldElementCodec for UnspendableAccount {
     fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
         // Expected sizes
         let account_id_size = 4;
-        let secret_size = 4;
+        let secret_size = 8;
         let total_size = account_id_size + secret_size;
 
         if elements.len() != total_size {
@@ -173,9 +174,12 @@ impl CircuitFragment for UnspendableAccount {
         }: &Self::Targets,
         builder: &mut CircuitBuilder<F, D>,
     ) {
-        let salt = builder.constant(string_to_felt(UNSPENDABLE_SALT));
+        let salt = injective_string_to_felt(UNSPENDABLE_SALT);
+        let salt_0_target = builder.constant(salt[0]);
+        let salt_1_target = builder.constant(salt[1]);
         let mut preimage = Vec::new();
-        preimage.push(salt);
+        preimage.push(salt_0_target);
+        preimage.push(salt_1_target);
         preimage.extend(secret);
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).

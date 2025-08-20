@@ -14,10 +14,10 @@ use crate::{
     inputs::CircuitInputs,
     storage_proof::leaf::{LeafInputs, LeafTargets},
 };
-use zk_circuits_common::utils::bytes_to_felts;
+use zk_circuits_common::utils::{digest_bytes_to_felts, injective_bytes_to_felts};
 use zk_circuits_common::{
     circuit::{CircuitFragment, D, F},
-    utils::BYTES_PER_ELEMENT,
+    utils::INJECTIVE_BYTES_PER_ELEMENT,
 };
 
 pub mod leaf;
@@ -97,7 +97,7 @@ impl StorageProof {
         let proof: Vec<Vec<F>> = processed_proof
             .proof
             .iter()
-            .map(|node| bytes_to_felts(node))
+            .map(|node| injective_bytes_to_felts(node))
             .collect();
         // print the length of the proof at index 4
         // println!(
@@ -110,7 +110,7 @@ impl StorageProof {
             .iter()
             .map(|&i| {
                 // Divide by 16 to get the field element index instead of the hex index.
-                let i = i / (BYTES_PER_ELEMENT * 2);
+                let i = i / (INJECTIVE_BYTES_PER_ELEMENT * 2);
                 F::from_canonical_usize(i)
             })
             .collect();
@@ -254,9 +254,9 @@ impl CircuitFragment for StorageProof {
         let funding_account = felts_to_hashout(&self.leaf_inputs.funding_account.0);
         let to_account = felts_to_hashout(&self.leaf_inputs.to_account.0);
 
-        pw.set_target(
-            targets.leaf_inputs.transfer_count,
-            self.leaf_inputs.transfer_count,
+        pw.set_target_arr(
+            &targets.leaf_inputs.transfer_count,
+            &self.leaf_inputs.transfer_count,
         )?;
         pw.set_hash_target(targets.leaf_inputs.funding_account, funding_account)?;
         pw.set_hash_target(targets.leaf_inputs.to_account, to_account)?;
@@ -271,7 +271,10 @@ impl CircuitFragment for StorageProof {
 
 #[cfg(feature = "std")]
 fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
-    let elements = bytes_to_felts(slice);
+    use zk_circuits_common::utils::BytesDigest;
+
+    let slice = BytesDigest::try_from(slice).expect("Slice length must be 32 bytes");
+    let elements = digest_bytes_to_felts(slice);
     HashOut {
         elements: elements.try_into().unwrap(),
     }

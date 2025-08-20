@@ -10,16 +10,18 @@ use plonky2::{
 use std::array;
 
 use crate::codec::ByteCodec;
-use crate::inputs::{BytesDigest, CircuitInputs};
+use crate::inputs::CircuitInputs;
 use crate::substrate_account::SubstrateAccount;
 use zk_circuits_common::circuit::{D, F};
-use zk_circuits_common::utils::{u128_to_felts, FELTS_PER_U128};
+use zk_circuits_common::utils::{
+    felts_to_u64, u128_to_felts, u64_to_felts, BytesDigest, FELTS_PER_U128,
+};
 
 pub const NUM_LEAF_INPUT_FELTS: usize = 11;
 
 #[derive(Debug, Clone)]
 pub struct LeafTargets {
-    pub transfer_count: Target,
+    pub transfer_count: [Target; 2],
     pub funding_account: HashOutTarget,
     pub to_account: HashOutTarget,
     pub funding_amount: [Target; FELTS_PER_U128],
@@ -27,7 +29,7 @@ pub struct LeafTargets {
 
 impl LeafTargets {
     pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
-        let transfer_count = builder.add_virtual_target();
+        let transfer_count = array::from_fn(|_| builder.add_virtual_target());
         let funding_account = builder.add_virtual_hash();
         let to_account = builder.add_virtual_hash();
         let funding_amount = array::from_fn(|_| builder.add_virtual_public_input());
@@ -41,17 +43,19 @@ impl LeafTargets {
     }
 
     pub fn collect_to_vec(&self) -> Vec<Target> {
-        core::iter::once(self.transfer_count)
-            .chain(self.funding_account.elements)
-            .chain(self.to_account.elements)
-            .chain(self.funding_amount)
+        self.transfer_count
+            .iter()
+            .chain(self.funding_account.elements.iter())
+            .chain(self.to_account.elements.iter())
+            .chain(self.funding_amount.iter())
+            .cloned()
             .collect()
     }
 }
 
 #[derive(Debug)]
 pub struct LeafInputs {
-    pub transfer_count: F,
+    pub transfer_count: [F; 2],
     pub funding_account: SubstrateAccount,
     pub to_account: SubstrateAccount,
     pub funding_amount: [F; FELTS_PER_U128],
@@ -64,7 +68,7 @@ impl LeafInputs {
         to_account: BytesDigest,
         funding_amount: u128,
     ) -> anyhow::Result<Self> {
-        let transfer_count = F::from_noncanonical_u64(transfer_count);
+        let transfer_count = u64_to_felts(transfer_count);
         let funding_amount = u128_to_felts(funding_amount);
         let funding_account = SubstrateAccount::from_bytes(funding_account.as_slice())?;
         let to_account = SubstrateAccount::from_bytes(to_account.as_slice())?;

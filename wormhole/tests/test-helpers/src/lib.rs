@@ -1,10 +1,11 @@
 use crate::storage_proof::{DEFAULT_ROOT_HASH, TestInputs};
 use wormhole_circuit::{
-    inputs::{BytesDigest, CircuitInputs, PrivateCircuitInputs, PublicCircuitInputs},
+    inputs::{CircuitInputs, PrivateCircuitInputs, PublicCircuitInputs},
     nullifier::Nullifier,
     storage_proof::ProcessedStorageProof,
     unspendable_account::UnspendableAccount,
 };
+use zk_circuits_common::utils::BytesDigest;
 
 pub const DEFAULT_SECRET: &str = "9aa84f99ef2de22e3070394176868df41d6a148117a36132d010529e19b018b7";
 pub const DEFAULT_TRANSFER_COUNT: u64 = 3032;
@@ -61,10 +62,8 @@ pub mod storage_proof {
     use crate::{
         DEFAULT_FUNDING_ACCOUNT, DEFAULT_FUNDING_AMOUNT, DEFAULT_TO_ACCOUNT, DEFAULT_TRANSFER_COUNT,
     };
-    use wormhole_circuit::{
-        inputs::BytesDigest,
-        storage_proof::{ProcessedStorageProof, StorageProof, leaf::LeafInputs},
-    };
+    use wormhole_circuit::storage_proof::{ProcessedStorageProof, StorageProof, leaf::LeafInputs};
+    use zk_circuits_common::utils::BytesDigest;
 
     pub const DEFAULT_ROOT_HASH: &str =
         "dc474827d8c59d4fa86a8dc6e602a24c9a1e510ed76ac7c05ee7d820d0e66fa4";
