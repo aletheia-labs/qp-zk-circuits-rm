@@ -16,14 +16,14 @@ fn test_u128_to_felts_to_u128_round_trip() {
         1u128,
         0x1234567890abcdefu128,
         u128::MAX,
-        (1u128 << 64) - 1,            // Max value for high part
+        (1u128 << 96) - 1,            // Max value for high part
         (1u128 << 64) | 0xabcdefu128, // Mixed high and low
     ];
 
     for num in test_cases {
         // u128 -> Vec<F>
         let felts = u128_to_felts(num);
-        assert_eq!(felts.len(), 2, "Expected exactly two field elements");
+        assert_eq!(felts.len(), 4, "Expected exactly four field elements");
 
         // Vec<F> -> u128
         let round_trip_num = felts_to_u128(felts);
@@ -72,6 +72,38 @@ fn test_felts_to_u128_to_felts_round_trip() {
         );
     }
 }
+#[test]
+fn test_u64_to_felts_to_u64_round_trip() {
+    // Test cases: zero, small, large, max u64, and random values
+    let test_cases = [
+        0u64,
+        1u64,
+        0x1234567890abcdefu64,
+        u64::MAX,
+        (1u64 << 32) - 1,           // Max value for high part
+        (1u64 << 32) | 0xabcdefu64, // Mixed high and low
+    ];
+
+    for num in test_cases {
+        // u64 -> Vec<F>
+        let felts = u64_to_felts(num);
+        assert_eq!(felts.len(), 2, "Expected exactly two field elements");
+
+        // Vec<F> -> u64
+        let round_trip_num = felts_to_u64(felts);
+
+        // Check that the high and low parts match
+        let expected_high = num >> 32;
+        let expected_low = num;
+        let expected = (expected_high << 32) | expected_low;
+        assert_eq!(
+            round_trip_num, expected,
+            "Round trip failed for input {}. Expected {}, got {}",
+            num, expected, round_trip_num
+        );
+    }
+}
+
 #[test]
 fn test_felts_to_u64_to_felts_round_trip() {
     // Test cases: various field element pairs within the field order

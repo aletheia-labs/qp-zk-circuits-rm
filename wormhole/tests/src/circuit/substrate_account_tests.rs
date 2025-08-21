@@ -1,10 +1,13 @@
-use plonky2::{field::types::Field, plonk::proof::ProofWithPublicInputs};
+use plonky2::{
+    field::types::{Field, Field64},
+    plonk::proof::ProofWithPublicInputs,
+};
 use wormhole_circuit::{
     codec::FieldElementCodec,
     substrate_account::{ExitAccountTargets, SubstrateAccount},
 };
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
-use zk_circuits_common::utils::ZERO_DIGEST;
+use zk_circuits_common::utils::{digest_felts_to_bytes, ZERO_DIGEST};
 
 #[cfg(test)]
 fn run_test(exit_account: &SubstrateAccount) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
@@ -49,11 +52,14 @@ fn test_exit_account_zero_address() -> anyhow::Result<()> {
 
 #[test]
 fn test_exit_account_max_address() -> anyhow::Result<()> {
-    let exit_account = SubstrateAccount::new(&[255u8; 32])?;
+    // The max address is the byte encoding of the [F::ORDER; 4] where each field element is u64::MAX.
+    let felts = [F::from_noncanonical_u64(F::ORDER - 1); 4];
+    let digest_felts_to_bytes = digest_felts_to_bytes(felts);
+    let exit_account = SubstrateAccount::new(&digest_felts_to_bytes.0)?;
     let elements = exit_account.to_field_elements();
     assert_eq!(elements.len(), 4, "Expected 4 field elements");
     // Each element should be u64::MAX (0xFFFFFFFFFFFFFFFF)
-    let expected_value = F::from_noncanonical_u64(u64::MAX);
+    let expected_value = F::from_noncanonical_u64(F::ORDER - 1);
     assert_eq!(
         elements,
         vec![expected_value; 4],

@@ -61,7 +61,7 @@ fn nullifier_codec() {
 
     // Encode the account as field elements and compare.
     let field_elements = nullifier.to_field_elements();
-    assert_eq!(field_elements.len(), 9);
+    assert_eq!(field_elements.len(), 14);
 
     // Decode the field elements back into a Nullifier
     let recovered_nullifier = Nullifier::from_field_elements(&field_elements).unwrap();
@@ -76,7 +76,7 @@ fn codec_invalid_length() {
     assert!(recovered_nullifier_result.is_err());
     assert_eq!(
         recovered_nullifier_result.unwrap_err().to_string(),
-        "Expected 9 field elements for Nullifier, got: 2"
+        "Expected 14 field elements for Nullifier, got: 2"
     );
 }
 
@@ -88,6 +88,6 @@ fn codec_empty_elements() {
     assert!(recovered_nullifier_result.is_err());
     assert_eq!(
         recovered_nullifier_result.unwrap_err().to_string(),
-        "Expected 9 field elements for Nullifier, got: 0"
+        "Expected 14 field elements for Nullifier, got: 0"
     );
 }

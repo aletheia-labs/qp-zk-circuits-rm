@@ -28,22 +28,23 @@ pub const UNSPENDABLE_SALT: &str = "wormhole";
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct UnspendableAccount {
     pub account_id: Digest,
-    pub secret: Vec<F>,
+    pub secret: [F; SECRET_NUM_TARGETS],
 }
 
 impl UnspendableAccount {
     pub fn new(account_id: BytesDigest, secret: &[u8]) -> Self {
         let account_id = digest_bytes_to_felts(account_id);
-        let secret = injective_bytes_to_felts(secret);
+        let secret: [F; SECRET_NUM_TARGETS] = injective_bytes_to_felts(secret).try_into().unwrap();
         Self { account_id, secret }
     }
 
     pub fn from_secret(secret: &[u8; 32]) -> Self {
         // First, convert the preimage to its representation as field elements.
         let mut preimage = Vec::new();
-        let secret_felts = injective_bytes_to_felts(secret);
+        let secret_felts: [F; SECRET_NUM_TARGETS] =
+            injective_bytes_to_felts(secret).try_into().unwrap();
         preimage.extend(injective_string_to_felt(UNSPENDABLE_SALT));
-        preimage.extend(secret_felts.clone());
+        preimage.extend(secret_felts);
 
         if preimage.len() != PREIMAGE_NUM_TARGETS {
             panic!(
@@ -76,8 +77,8 @@ impl ByteCodec for UnspendableAccount {
     fn from_bytes(slice: &[u8]) -> anyhow::Result<Self> {
         let f_size = size_of::<F>(); // 8 bytes
         let account_id_size = 4 * f_size; // 4 field elements
-        let preimage_size = 10 * f_size; // 10 field elements
-        let total_size = account_id_size + preimage_size;
+        let secret_size = 8 * f_size; // 8 field elements
+        let total_size = account_id_size + secret_size;
 
         if slice.len() != total_size {
             return Err(anyhow::anyhow!(
@@ -95,13 +96,18 @@ impl ByteCodec for UnspendableAccount {
         let account_id = digest_bytes_to_felts(account_id_bytes);
         offset += account_id_size;
 
-        // Deserialize preimage
-        let preimage = injective_bytes_to_felts(&slice[offset..offset + preimage_size]);
+        // Deserialize secret
+        let secret: [F; SECRET_NUM_TARGETS] =
+            injective_bytes_to_felts(&slice[offset..offset + secret_size])
+                .try_into()
+                .map_err(|_| {
+                    anyhow::anyhow!(
+                "Failed to deserialize unspendable account secret, expected {} field elements",
+                SECRET_NUM_TARGETS
+            )
+                })?;
 
-        Ok(Self {
-            account_id,
-            secret: preimage,
-        })
+        Ok(Self { account_id, secret })
     }
 }
 
@@ -109,7 +115,7 @@ impl FieldElementCodec for UnspendableAccount {
     fn to_field_elements(&self) -> Vec<F> {
         let mut elements = Vec::new();
         elements.extend(self.account_id.to_vec());
-        elements.extend(self.secret.clone());
+        elements.extend(self.secret);
         elements
     }
 
@@ -134,8 +140,15 @@ impl FieldElementCodec for UnspendableAccount {
             .map_err(|_| anyhow::anyhow!("Failed to deserialize unspendable account id"))?;
         offset += account_id_size;
 
-        // Deserialize preimage
-        let secret = elements[offset..offset + secret_size].to_vec();
+        // Deserialize secret
+        let secret = elements[offset..offset + secret_size]
+            .try_into()
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "Failed to deserialize unspendable account secret, expected {} field elements",
+                    SECRET_NUM_TARGETS
+                )
+            })?;
 
         Ok(Self { account_id, secret })
     }
@@ -150,14 +163,17 @@ impl From<&CircuitInputs> for UnspendableAccount {
 #[derive(Debug, Clone)]
 pub struct UnspendableAccountTargets {
     pub account_id: HashOutTarget,
-    pub secret: Vec<Target>,
+    pub secret: [Target; SECRET_NUM_TARGETS],
 }
 
 impl UnspendableAccountTargets {
     pub fn new(builder: &mut CircuitBuilder<F, D>) -> Self {
         Self {
             account_id: builder.add_virtual_hash(),
-            secret: builder.add_virtual_targets(SECRET_NUM_TARGETS),
+            secret: builder
+                .add_virtual_targets(SECRET_NUM_TARGETS)
+                .try_into()
+                .unwrap(),
         }
     }
 }

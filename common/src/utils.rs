@@ -26,7 +26,7 @@ pub struct BytesDigest(pub [u8; 32]);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DigestError {
-    ChunkOutOfRange { chunk_index: usize, value: u64 },
+    ChunkOutOfFieldRange { chunk_index: usize, value: u64 },
     InvalidLength { expected: usize, got: usize },
 }
 
@@ -41,7 +41,7 @@ impl TryFrom<&[u8]> for BytesDigest {
         for (i, chunk) in bytes.chunks(8).enumerate() {
             let v = u64::from_le_bytes(chunk.try_into().unwrap());
             if v >= F::ORDER {
-                return Err(DigestError::ChunkOutOfRange {
+                return Err(DigestError::ChunkOutOfFieldRange {
                     chunk_index: i,
                     value: v,
                 });
