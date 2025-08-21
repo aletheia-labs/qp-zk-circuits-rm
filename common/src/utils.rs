@@ -16,6 +16,7 @@ pub const FELTS_PER_U64: usize = 2;
 pub const DIGEST_NUM_FIELD_ELEMENTS: usize = 4;
 
 pub const ZERO_DIGEST: Digest = [F::ZERO; DIGEST_NUM_FIELD_ELEMENTS];
+pub const BIT_32_LIMB_MASK: u64 = 0xFFFF_FFFF;
 
 pub type Digest = [F; DIGEST_NUM_FIELD_ELEMENTS];
 pub type PrivateKey = [F; 4];
@@ -93,30 +94,35 @@ impl Deref for BytesDigest {
 }
 
 pub fn u128_to_felts(num: u128) -> [F; FELTS_PER_U128] {
-    [
-        F::from_noncanonical_u64((num >> 96) as u64),
-        F::from_noncanonical_u64((num >> 64) as u64),
-        F::from_noncanonical_u64((num >> 32) as u64),
-        F::from_noncanonical_u64(num as u64),
-    ]
+    (0..FELTS_PER_U128)
+        .map(|i| {
+            let shift = 96 - 32 * i;
+            let limb = ((num >> shift) & BIT_32_LIMB_MASK as u128) as u64;
+            F::from_canonical_u64(limb)
+        })
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap()
 }
 
 pub fn felts_to_u128(felts: [F; FELTS_PER_U128]) -> u128 {
     felts.iter().enumerate().fold(0u128, |acc, (i, felt)| {
-        acc | ((*felt).to_noncanonical_u64() as u128) << (96 - 32 * i)
+        let limb = felt.to_canonical_u64() & BIT_32_LIMB_MASK; // force 32-bit
+        acc | ((limb as u128) << (96 - 32 * i))
     })
 }
 
 pub fn u64_to_felts(num: u64) -> [F; FELTS_PER_U64] {
     [
-        F::from_noncanonical_u64((num >> 32) as u64),
-        F::from_noncanonical_u64(num as u64),
+        F::from_noncanonical_u64((num >> 32) & BIT_32_LIMB_MASK),
+        F::from_noncanonical_u64(num & BIT_32_LIMB_MASK),
     ]
 }
 
 pub fn felts_to_u64(felts: [F; FELTS_PER_U64]) -> u64 {
     felts.iter().enumerate().fold(0u64, |acc, (i, felt)| {
-        acc | ((*felt).to_noncanonical_u64() as u64) << (32 - 32 * i)
+        let limb = felt.to_noncanonical_u64() & BIT_32_LIMB_MASK; // force 32-bit
+        acc | (limb << (32 - 32 * i))
     })
 }
 
@@ -129,12 +135,12 @@ pub fn injective_string_to_felt(input: &str) -> [F; 2] {
     let mut padded = [0u8; 8];
     padded[..bytes.len()].copy_from_slice(bytes);
 
-    let first = u64::from_le_bytes(padded[0..4].try_into().unwrap());
-    let second = u64::from_le_bytes(padded[4..8].try_into().unwrap());
+    let first = u32::from_le_bytes(padded[0..4].try_into().unwrap());
+    let second = u32::from_le_bytes(padded[4..8].try_into().unwrap());
 
     [
-        F::from_noncanonical_u64(first),
-        F::from_noncanonical_u64(second),
+        F::from_noncanonical_u64(first as u64),
+        F::from_noncanonical_u64(second as u64),
     ]
 }
 
@@ -160,7 +166,7 @@ pub fn injective_felts_to_bytes(input: &[F]) -> Vec<u8> {
     for field_element in input {
         let value = field_element.to_noncanonical_u64();
         let value_bytes = &value.to_le_bytes()[..4];
-        bytes.extend_from_slice(&value_bytes);
+        bytes.extend_from_slice(value_bytes);
     }
 
     bytes

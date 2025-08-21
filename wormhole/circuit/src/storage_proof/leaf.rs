@@ -2,7 +2,6 @@
 use alloc::vec::Vec;
 #[cfg(not(feature = "std"))]
 use core::array;
-use plonky2::field::types::Field;
 use plonky2::{
     hash::hash_types::HashOutTarget, iop::target::Target, plonk::circuit_builder::CircuitBuilder,
 };
@@ -14,14 +13,14 @@ use crate::inputs::CircuitInputs;
 use crate::substrate_account::SubstrateAccount;
 use zk_circuits_common::circuit::{D, F};
 use zk_circuits_common::utils::{
-    felts_to_u64, u128_to_felts, u64_to_felts, BytesDigest, FELTS_PER_U128,
+    u128_to_felts, u64_to_felts, BytesDigest, FELTS_PER_U128, FELTS_PER_U64,
 };
 
 pub const NUM_LEAF_INPUT_FELTS: usize = 11;
 
 #[derive(Debug, Clone)]
 pub struct LeafTargets {
-    pub transfer_count: [Target; 2],
+    pub transfer_count: [Target; FELTS_PER_U64],
     pub funding_account: HashOutTarget,
     pub to_account: HashOutTarget,
     pub funding_amount: [Target; FELTS_PER_U128],
@@ -51,11 +50,18 @@ impl LeafTargets {
             .cloned()
             .collect()
     }
+    pub fn collect_32_bit_targets(&self) -> Vec<Target> {
+        self.transfer_count
+            .iter()
+            .chain(self.funding_amount.iter())
+            .cloned()
+            .collect()
+    }
 }
 
 #[derive(Debug)]
 pub struct LeafInputs {
-    pub transfer_count: [F; 2],
+    pub transfer_count: [F; FELTS_PER_U64],
     pub funding_account: SubstrateAccount,
     pub to_account: SubstrateAccount,
     pub funding_amount: [F; FELTS_PER_U128],

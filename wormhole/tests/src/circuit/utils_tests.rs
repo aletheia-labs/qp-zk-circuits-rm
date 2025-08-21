@@ -1,6 +1,6 @@
-use plonky2::field::types::{Field, Field64};
+use plonky2::field::types::Field;
 use zk_circuits_common::circuit::F;
-use zk_circuits_common::utils::{felts_to_u128, u128_to_felts};
+use zk_circuits_common::utils::{felts_to_u128, felts_to_u64, u128_to_felts, u64_to_felts};
 
 // Helper to create F from a u64 for concise test cases
 #[cfg(test)]
@@ -44,16 +44,21 @@ fn test_u128_to_felts_to_u128_round_trip() {
 fn test_felts_to_u128_to_felts_round_trip() {
     // Test cases: various field element pairs within the field order
     let test_cases = [
-        (f(0), f(0)),
-        (f(1), f(1)),
-        (f(0x1234567890abcdef), f(0xabcdef1234567890)),
-        (f(F::ORDER - 1), f(F::ORDER - 1)), // Max field element
-        (f(0), f(F::ORDER - 1)),            // Zero high, max low
-        (f(F::ORDER - 1), f(0)),            // Max high, zero low
+        (f(0), f(0), f(0), f(0)),
+        (f(1), f(1), f(1), f(1)),
+        (f(0x1234567), f(0xabcdef), f(0x1234567), f(0xabcdef)),
+        (
+            f(u32::MAX as u64),
+            f(u32::MAX as u64),
+            f(u32::MAX as u64),
+            f(u32::MAX as u64),
+        ), // Max field element
+        (f(0), f(u32::MAX as u64), f(0), f(u32::MAX as u64)), // Zero high, max low
+        (f(u32::MAX as u64), f(0), f(u32::MAX as u64), f(0)), // Max high, zero low
     ];
 
-    for (high, low) in test_cases {
-        let felts = [high, low];
+    for (l3, l2, l1, l0) in test_cases {
+        let felts = [l3, l2, l1, l0];
 
         // Vec<F> -> u128
         let num = felts_to_u128(felts);
@@ -67,23 +72,54 @@ fn test_felts_to_u128_to_felts_round_trip() {
         );
     }
 }
+#[test]
+fn test_felts_to_u64_to_felts_round_trip() {
+    // Test cases: various field element pairs within the field order
+    let test_cases = [
+        (f(0), f(0)),                             // Zero
+        (f(1), f(1)),                             // One
+        (f(0x12345678), f(0x9abcdef0)),           // Mixed values
+        (f(u32::MAX as u64), f(u32::MAX as u64)), // Max field element
+        (f(0), f(u32::MAX as u64)),               // Zero high, max low
+        (f(u32::MAX as u64), f(0)),               // Max high, zero low
+    ];
 
+    for (l1, l0) in test_cases {
+        let felts = [l1, l0];
+
+        // Vec<F> -> u64
+        let num = felts_to_u64(felts);
+
+        // u64 -> Vec<F>
+        let round_trip_felts = u64_to_felts(num);
+        assert_eq!(
+            round_trip_felts, felts,
+            "Round trip failed for input {:?}. Got {:?}",
+            felts, round_trip_felts
+        );
+    }
+}
 #[test]
 fn test_edge_cases() {
     // Test specific edge cases
     let num = u128::MAX;
     let felts = u128_to_felts(num);
-    assert_eq!(felts.len(), 2);
+    assert_eq!(felts.len(), 4);
     let result = felts_to_u128(felts);
-    let expected_high = (u128::MAX >> 64) as u64;
-    let expected_low = u128::MAX as u64;
-    let expected = ((expected_high as u128) << 64) | (expected_low as u128);
+    let expected_l3 = (u128::MAX >> 96) as u64;
+    let expected_l2 = (u128::MAX >> 64) as u64;
+    let expected_l1 = (u128::MAX >> 32) as u64;
+    let expected_l0 = (u128::MAX) as u64;
+    let expected = ((expected_l3 as u128) << 96)
+        | ((expected_l2 as u128) << 64)
+        | ((expected_l1 as u128) << 32)
+        | (expected_l0 as u128);
     assert_eq!(result, expected);
 
     // Test zero
     let num = 0u128;
     let felts = u128_to_felts(num);
-    assert_eq!(felts, [f(0), f(0)]);
+    assert_eq!(felts, [f(0), f(0), f(0), f(0)]);
     let result = felts_to_u128(felts);
     assert_eq!(result, 0);
 }

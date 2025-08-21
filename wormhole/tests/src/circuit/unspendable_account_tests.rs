@@ -3,7 +3,10 @@ use wormhole_circuit::{
     codec::FieldElementCodec,
     unspendable_account::{UnspendableAccount, UnspendableAccountTargets},
 };
-use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
+use zk_circuits_common::{
+    circuit::{CircuitFragment, C, D, F},
+    utils::BytesDigest,
+};
 
 #[cfg(test)]
 const SECRETS: [&str; 5] = [
@@ -48,7 +51,9 @@ fn preimage_matches_right_address() {
         let decoded_address = hex::decode(address).unwrap();
         let unspendable_account = UnspendableAccount::from_secret(&decoded_secret);
 
-        let address = zk_circuits_common::utils::bytes_to_felts(&decoded_address);
+        let decoded_address = BytesDigest::try_from(decoded_address.as_slice()).unwrap();
+
+        let address = zk_circuits_common::utils::digest_bytes_to_felts(decoded_address);
         assert_eq!(unspendable_account.account_id.to_vec(), address);
         let result = run_test(&unspendable_account);
         assert!(result.is_ok());
@@ -62,9 +67,10 @@ fn preimage_does_not_match_wrong_address() {
     let mut unspendable_account = UnspendableAccount::from_secret(&decoded_secret);
 
     // Override the correct hash with the wrong one.
-    let wrong_hash =
-        zk_circuits_common::utils::bytes_to_felts(&hex::decode(wrong_address).unwrap());
-    unspendable_account.account_id = wrong_hash.try_into().unwrap();
+    let wrong_address =
+        BytesDigest::try_from(hex::decode(wrong_address).unwrap().as_slice()).unwrap();
+    let wrong_hash = zk_circuits_common::utils::digest_bytes_to_felts(wrong_address);
+    unspendable_account.account_id = wrong_hash;
 
     let result = run_test(&unspendable_account);
     assert!(result.is_err());

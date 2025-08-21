@@ -5,7 +5,7 @@ use wormhole_circuit::{
     nullifier::{Nullifier, NullifierTargets},
 };
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
-use zk_circuits_common::utils::bytes_to_felts;
+use zk_circuits_common::utils::injective_bytes_to_felts;
 
 #[cfg(test)]
 fn run_test(nullifier: &Nullifier) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
@@ -41,7 +41,7 @@ fn invalid_secret_fails_proof() {
     // Flip the first byte of the preimage.
     let mut invalid_bytes = hex::decode(DEFAULT_SECRET).unwrap();
     invalid_bytes[0] ^= 0xFF;
-    valid_nullifier.secret = bytes_to_felts(&invalid_bytes);
+    valid_nullifier.secret = injective_bytes_to_felts(&invalid_bytes);
 
     let res = run_test(&valid_nullifier);
     assert!(res.is_err());

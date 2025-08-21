@@ -23,7 +23,7 @@ use zk_circuits_common::{
 pub mod leaf;
 
 pub const MAX_PROOF_LEN: usize = 20;
-pub const PROOF_NODE_MAX_SIZE_F: usize = 94; // Should match the felt preimage max set on poseidon-resonance crate.
+pub const PROOF_NODE_MAX_SIZE_F: usize = 188; // Should match the felt preimage max set on poseidon-resonance crate.
 pub const PROOF_NODE_MAX_SIZE_B: usize = 256;
 pub const FELTS_PER_AMOUNT: usize = 2;
 
@@ -154,6 +154,12 @@ impl CircuitFragment for StorageProof {
         use plonky2::hash::poseidon::PoseidonHash;
         use zk_circuits_common::gadgets::is_const_less_than;
 
+        let leaf_targets_32_bit = leaf_inputs.collect_32_bit_targets();
+        // Range contrain the first 2 and last 4 elements of the leaf inputs (transfer_count and funding_amount) to be 32 bits.
+        for target in leaf_targets_32_bit.iter() {
+            builder.range_check(*target, 32);
+        }
+
         // Calculate the leaf inputs hash.
         let leaf_inputs_hash =
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(leaf_inputs.collect_to_vec());
@@ -189,7 +195,9 @@ impl CircuitFragment for StorageProof {
                 builder.zero(),
             ];
             let expected_hash_index = indices[i];
-            for (j, _felt) in node.iter().enumerate().take(PROOF_NODE_MAX_SIZE_F - 4) {
+            for (j, felt) in node.iter().enumerate().take(PROOF_NODE_MAX_SIZE_F - 8) {
+                // Range constrain each target in the node to be 32 bits.
+                builder.range_check(*felt, 32);
                 let felt_index = builder.constant(F::from_canonical_usize(j));
                 let is_start_of_hash = builder.is_equal(felt_index, expected_hash_index);
 
@@ -197,6 +205,10 @@ impl CircuitFragment for StorageProof {
                 for (hash_i, felt) in found_hash.iter_mut().enumerate() {
                     *felt = builder.select(is_start_of_hash, node[j + hash_i], *felt);
                 }
+            }
+            // Range check the last 8 felts of the node to be 32 bits.
+            for felt in node.iter().skip(PROOF_NODE_MAX_SIZE_F - 8) {
+                builder.range_check(*felt, 32);
             }
 
             // Lastly, we do an additional check if this is the leaf node - that the hash of its
@@ -223,7 +235,15 @@ impl CircuitFragment for StorageProof {
 
         const EMPTY_PROOF_NODE: [F; PROOF_NODE_MAX_SIZE_F] = [F::ZERO; PROOF_NODE_MAX_SIZE_F];
 
-        pw.set_hash_target(targets.root_hash, slice_to_hashout(&self.root_hash))?;
+        pw.set_hash_target(targets.root_hash, bytes_32_to_hashout(self.root_hash))?;
+        // bail if proof is too long
+        if self.proof.len() > MAX_PROOF_LEN {
+            bail!(
+                "proof length exceeds maximum allowed length: {} > {}",
+                self.proof.len(),
+                MAX_PROOF_LEN
+            );
+        }
         pw.set_target(targets.proof_len, F::from_canonical_usize(self.proof.len()))?;
 
         for i in 0..MAX_PROOF_LEN {
@@ -270,12 +290,10 @@ impl CircuitFragment for StorageProof {
 }
 
 #[cfg(feature = "std")]
-fn slice_to_hashout(slice: &[u8]) -> HashOut<F> {
+fn bytes_32_to_hashout(bytes: [u8; 32]) -> HashOut<F> {
     use zk_circuits_common::utils::BytesDigest;
 
-    let slice = BytesDigest::try_from(slice).expect("Slice length must be 32 bytes");
-    let elements = digest_bytes_to_felts(slice);
-    HashOut {
-        elements: elements.try_into().unwrap(),
-    }
+    let digest = BytesDigest::from(bytes);
+    let elements = digest_bytes_to_felts(digest);
+    HashOut { elements }
 }

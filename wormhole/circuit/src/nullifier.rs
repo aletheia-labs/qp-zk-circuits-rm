@@ -11,7 +11,6 @@ use zk_circuits_common::utils::digest_bytes_to_felts;
 use crate::codec::ByteCodec;
 use crate::codec::FieldElementCodec;
 use crate::inputs::CircuitInputs;
-use plonky2::field::types::Field;
 use plonky2::{
     hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
     iop::{
@@ -27,7 +26,7 @@ use zk_circuits_common::utils::{
 };
 
 pub const NULLIFIER_SALT: &str = "~nullif~";
-pub const SECRET_NUM_TARGETS: usize = 4;
+pub const SECRET_NUM_TARGETS: usize = 8;
 pub const NONCE_NUM_TARGETS: usize = 1;
 pub const FUNDING_ACCOUNT_NUM_TARGETS: usize = 4;
 pub const TRANSFER_COUNT_NUM_TARGETS: usize = 2;
@@ -39,7 +38,7 @@ pub const NULLIFIER_SIZE_FELTS: usize = 4 + 4 + 1 + 4;
 pub struct Nullifier {
     pub hash: Digest,
     pub secret: Vec<F>,
-    transfer_count: [F; 2],
+    transfer_count: [F; TRANSFER_COUNT_NUM_TARGETS],
 }
 
 impl Nullifier {
@@ -107,9 +106,7 @@ impl ByteCodec for Nullifier {
         let digest = slice[offset..offset + hash_size]
             .try_into()
             .map_err(|_| anyhow::anyhow!("Failed to deserialize nullifier hash"))?;
-        let hash = digest_bytes_to_felts(digest)
-            .try_into()
-            .map_err(|_| anyhow::anyhow!("Failed to deserialize nullifier hash"))?;
+        let hash = digest_bytes_to_felts(digest);
         offset += hash_size;
 
         // Deserialize secret
@@ -130,7 +127,7 @@ impl ByteCodec for Nullifier {
                 transfer_count.len()
             ));
         }
-        let transfer_count: [F; 2] = transfer_count.try_into().unwrap();
+        let transfer_count: [F; TRANSFER_COUNT_NUM_TARGETS] = transfer_count.try_into().unwrap();
 
         Ok(Self {
             hash,
@@ -201,7 +198,7 @@ impl From<&CircuitInputs> for Nullifier {
 pub struct NullifierTargets {
     pub hash: HashOutTarget,
     pub secret: Vec<Target>,
-    pub transfer_count: [Target; 2],
+    pub transfer_count: [Target; TRANSFER_COUNT_NUM_TARGETS],
 }
 
 impl NullifierTargets {
@@ -230,12 +227,15 @@ impl CircuitFragment for Nullifier {
     ) {
         let mut preimage = Vec::new();
         let salt_felts = injective_string_to_felt(NULLIFIER_SALT);
-        let salt_0 = builder.constant(salt_felts[0]);
-        let salt_1 = builder.constant(salt_felts[1]);
-        preimage.push(salt_0);
-        preimage.push(salt_1);
+        preimage.push(builder.constant(salt_felts[0]));
+        preimage.push(builder.constant(salt_felts[1]));
         preimage.extend(secret);
         preimage.extend(transfer_count);
+
+        // Range check all the preimage targets to be 32 bits.
+        for target in preimage.iter() {
+            builder.range_check(*target, 32);
+        }
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).
         let inner_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(preimage.clone());

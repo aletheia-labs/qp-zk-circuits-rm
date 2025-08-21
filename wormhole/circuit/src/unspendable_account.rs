@@ -21,8 +21,8 @@ use zk_circuits_common::utils::{
     injective_felts_to_bytes, injective_string_to_felt, BytesDigest, Digest,
 };
 
-pub const SECRET_NUM_TARGETS: usize = 4;
-pub const PREIMAGE_NUM_TARGETS: usize = 5;
+pub const SECRET_NUM_TARGETS: usize = 8;
+pub const PREIMAGE_NUM_TARGETS: usize = 10;
 pub const UNSPENDABLE_SALT: &str = "wormhole";
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -48,7 +48,7 @@ impl UnspendableAccount {
         if preimage.len() != PREIMAGE_NUM_TARGETS {
             panic!(
                 "Expected secret to be 80 bytes (10 field elements), got {} field elements",
-                preimage.len() - 1
+                preimage.len()
             );
         }
 
@@ -175,11 +175,15 @@ impl CircuitFragment for UnspendableAccount {
         builder: &mut CircuitBuilder<F, D>,
     ) {
         let salt = injective_string_to_felt(UNSPENDABLE_SALT);
-        let salt_0_target = builder.constant(salt[0]);
-        let salt_1_target = builder.constant(salt[1]);
         let mut preimage = Vec::new();
-        preimage.push(salt_0_target);
-        preimage.push(salt_1_target);
+        preimage.push(builder.constant(salt[0]));
+        preimage.push(builder.constant(salt[1]));
+        // Perform a range check on the salt to ensure it is 32 bits.
+        for target in preimage.iter() {
+            builder.range_check(*target, 32);
+        }
+        // Don't need to perform a range check no the secret since we are already donig that on the
+        // nullifier circuit and we ensuring the secret is the same across both circuits.
         preimage.extend(secret);
 
         // Compute the `generated_account` by double-hashing the preimage (salt + secret).

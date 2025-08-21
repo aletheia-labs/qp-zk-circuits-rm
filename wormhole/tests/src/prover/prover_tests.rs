@@ -3,8 +3,9 @@ use std::fs;
 use hex;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use test_helpers::storage_proof::TestInputs;
-use wormhole_circuit::inputs::{BytesDigest, CircuitInputs, PublicCircuitInputs};
+use wormhole_circuit::inputs::{CircuitInputs, PublicCircuitInputs};
 use wormhole_prover::WormholeProver;
+use zk_circuits_common::utils::BytesDigest;
 
 #[cfg(test)]
 const CIRCUIT_CONFIG: CircuitConfig = CircuitConfig::standard_recursion_config();
