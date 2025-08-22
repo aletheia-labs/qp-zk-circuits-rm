@@ -5,7 +5,6 @@
 .direnv
 .envrc
 
-Cargo.lock
 **/.DS_Store
 
 # generated binary files
