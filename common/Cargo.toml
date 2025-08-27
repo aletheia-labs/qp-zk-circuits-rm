@@ -14,5 +14,4 @@ serde = { workspace = true }
 [features]
 default = ["std"]
 std = ["anyhow/std", "plonky2/std", "serde/std"]
-no_std = []
 no_random = ["plonky2/no_random"]
