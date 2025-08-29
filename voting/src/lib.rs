@@ -318,7 +318,7 @@ mod voting_tests {
         let path_indices: Vec<bool> = vec![false, false];
         let actual_merkle_depth = 2;
 
-        let digest_bytes = BytesDigest::from([42u8; 32]);
+        let digest_bytes = BytesDigest::try_from([42u8; 32]).unwrap();
         let proposal_id: Digest = digest_bytes_to_felts(digest_bytes);
         let vote = true;
         let nullifier = compute_nullifier(&voter_private_key, &proposal_id);

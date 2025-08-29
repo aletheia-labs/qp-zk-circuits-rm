@@ -38,7 +38,14 @@ impl TryFrom<&[u8]> for BytesDigest {
             expected: 32,
             got: value.len(),
         })?;
-        for (i, chunk) in bytes.chunks(8).enumerate() {
+        BytesDigest::try_from(bytes)
+    }
+}
+
+impl TryFrom<[u8; 32]> for BytesDigest {
+    type Error = DigestError;
+    fn try_from(value: [u8; 32]) -> Result<Self, Self::Error> {
+        for (i, chunk) in value.chunks(8).enumerate() {
             let v = u64::from_le_bytes(chunk.try_into().unwrap());
             if v >= F::ORDER {
                 return Err(DigestError::ChunkOutOfFieldRange {
@@ -47,19 +54,7 @@ impl TryFrom<&[u8]> for BytesDigest {
                 });
             }
         }
-        Ok(BytesDigest(bytes))
-    }
-}
-
-impl From<[u8; 32]> for BytesDigest {
-    fn from(value: [u8; 32]) -> Self {
-        for (i, chunk) in value.chunks(8).enumerate() {
-            let v = u64::from_le_bytes(chunk.try_into().unwrap());
-            if v >= F::ORDER {
-                panic!("Invalid digest value: chunk {} out of range: {}", i, v);
-            }
-        }
-        BytesDigest(value)
+        Ok(BytesDigest(value))
     }
 }
 
@@ -93,7 +88,25 @@ impl Deref for BytesDigest {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FeltWidthError {
+    pub index: usize, // which limb failed
+    pub value: u64,   // canonical u64 value of the offending felt
+}
+
+#[inline]
+fn as_32_bit_limb(felt: F, index: usize) -> Result<u64, FeltWidthError> {
+    // Prefer canonical value when checking width.
+    let v = felt.to_canonical_u64();
+    if v <= BIT_32_LIMB_MASK {
+        Ok(v)
+    } else {
+        Err(FeltWidthError { index, value: v })
+    }
+}
+
 pub fn u128_to_felts(num: u128) -> [F; FELTS_PER_U128] {
+    // We are breaking up the u128 into four 32 bit limbs, which is always canonical since F::ORDER > u32::MAX.
     (0..FELTS_PER_U128)
         .map(|i| {
             let shift = 96 - 32 * i;
@@ -105,11 +118,13 @@ pub fn u128_to_felts(num: u128) -> [F; FELTS_PER_U128] {
         .unwrap()
 }
 
-pub fn felts_to_u128(felts: [F; FELTS_PER_U128]) -> u128 {
-    felts.iter().enumerate().fold(0u128, |acc, (i, felt)| {
-        let limb = felt.to_canonical_u64() & BIT_32_LIMB_MASK; // force 32-bit
-        acc | ((limb as u128) << (96 - 32 * i))
-    })
+pub fn felts_to_u128(felts: [F; FELTS_PER_U128]) -> Result<u128, FeltWidthError> {
+    let mut out = 0u128;
+    for (i, felt) in felts.into_iter().enumerate() {
+        let limb = as_32_bit_limb(felt, i)?; // validate < 2^32
+        out |= (limb as u128) << (96 - 32 * i);
+    }
+    Ok(out)
 }
 
 pub fn u64_to_felts(num: u64) -> [F; FELTS_PER_U64] {
@@ -119,18 +134,21 @@ pub fn u64_to_felts(num: u64) -> [F; FELTS_PER_U64] {
     ]
 }
 
-pub fn felts_to_u64(felts: [F; FELTS_PER_U64]) -> u64 {
-    felts.iter().enumerate().fold(0u64, |acc, (i, felt)| {
-        let limb = felt.to_noncanonical_u64() & BIT_32_LIMB_MASK; // force 32-bit
-        acc | (limb << (32 - 32 * i))
-    })
+pub fn felts_to_u64(felts: [F; FELTS_PER_U64]) -> Result<u64, FeltWidthError> {
+    let mut out = 0u64;
+    for (i, felt) in felts.into_iter().enumerate() {
+        let limb = as_32_bit_limb(felt, i)?; // validate < 2^32
+                                             // i = 0 -> shift 32, i = 1 -> shift 0
+        out |= limb << (32 - 32 * i);
+    }
+    Ok(out)
 }
 
 // Encodes an 8-byte string into two field elements.
 // We break into 32 bit limbs to ensure injective field element mapping.
 pub fn injective_string_to_felt(input: &str) -> [F; 2] {
     let bytes = input.as_bytes();
-    assert!(bytes.len() <= 8, "String must be at most 8 bytes long");
+    assert!(bytes.len() == 8, "String must be exactly 8 bytes long");
 
     let mut padded = [0u8; 8];
     padded[..bytes.len()].copy_from_slice(bytes);
@@ -160,16 +178,16 @@ pub fn injective_bytes_to_felts(input: &[u8]) -> Vec<F> {
 }
 
 /// Converts a given field element slice into its byte representation.
-pub fn injective_felts_to_bytes(input: &[F]) -> Vec<u8> {
+pub fn injective_felts_to_bytes(input: &[F]) -> Result<Vec<u8>, FeltWidthError> {
     let mut bytes: Vec<u8> = Vec::new();
 
-    for field_element in input {
-        let value = field_element.to_noncanonical_u64();
+    for (i, field_element) in input.iter().enumerate() {
+        let value = as_32_bit_limb(*field_element, i)?;
         let value_bytes = &value.to_le_bytes()[..INJECTIVE_BYTES_PER_ELEMENT];
         bytes.extend_from_slice(value_bytes);
     }
 
-    bytes
+    Ok(bytes)
 }
 
 pub fn digest_bytes_to_felts(input: BytesDigest) -> Digest {

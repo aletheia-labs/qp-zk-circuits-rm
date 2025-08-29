@@ -26,7 +26,7 @@ fn test_u128_to_felts_to_u128_round_trip() {
         assert_eq!(felts.len(), 4, "Expected exactly four field elements");
 
         // Vec<F> -> u128
-        let round_trip_num = felts_to_u128(felts);
+        let round_trip_num = felts_to_u128(felts).unwrap();
 
         // Check that the high and low parts match
         let expected_high = (num >> 64) as u64;
@@ -61,7 +61,7 @@ fn test_felts_to_u128_to_felts_round_trip() {
         let felts = [l3, l2, l1, l0];
 
         // Vec<F> -> u128
-        let num = felts_to_u128(felts);
+        let num = felts_to_u128(felts).unwrap();
 
         // u128 -> Vec<F>
         let round_trip_felts = u128_to_felts(num);
@@ -90,7 +90,7 @@ fn test_u64_to_felts_to_u64_round_trip() {
         assert_eq!(felts.len(), 2, "Expected exactly two field elements");
 
         // Vec<F> -> u64
-        let round_trip_num = felts_to_u64(felts);
+        let round_trip_num = felts_to_u64(felts).unwrap();
 
         // Check that the high and low parts match
         let expected_high = num >> 32;
@@ -120,7 +120,7 @@ fn test_felts_to_u64_to_felts_round_trip() {
         let felts = [l1, l0];
 
         // Vec<F> -> u64
-        let num = felts_to_u64(felts);
+        let num = felts_to_u64(felts).unwrap();
 
         // u64 -> Vec<F>
         let round_trip_felts = u64_to_felts(num);
@@ -137,7 +137,7 @@ fn test_edge_cases() {
     let num = u128::MAX;
     let felts = u128_to_felts(num);
     assert_eq!(felts.len(), 4);
-    let result = felts_to_u128(felts);
+    let result = felts_to_u128(felts).unwrap();
     let expected_l3 = (u128::MAX >> 96) as u64;
     let expected_l2 = (u128::MAX >> 64) as u64;
     let expected_l1 = (u128::MAX >> 32) as u64;
@@ -152,6 +152,6 @@ fn test_edge_cases() {
     let num = 0u128;
     let felts = u128_to_felts(num);
     assert_eq!(felts, [f(0), f(0), f(0), f(0)]);
-    let result = felts_to_u128(felts);
+    let result = felts_to_u128(felts).unwrap();
     assert_eq!(result, 0);
 }

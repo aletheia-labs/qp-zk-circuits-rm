@@ -81,8 +81,8 @@ impl ByteCodec for Nullifier {
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend(*digest_felts_to_bytes(self.hash));
-        bytes.extend(injective_felts_to_bytes(&self.secret));
-        bytes.extend(injective_felts_to_bytes(&self.transfer_count));
+        bytes.extend(injective_felts_to_bytes(&self.secret).unwrap());
+        bytes.extend(injective_felts_to_bytes(&self.transfer_count).unwrap());
         bytes
     }
 
@@ -147,9 +147,9 @@ impl FieldElementCodec for Nullifier {
     }
 
     fn from_field_elements(elements: &[F]) -> anyhow::Result<Self> {
-        let hash_size = 4; // 32 bytes w/ 64 bit limbs = 4 field elements
-        let secret_size = 8; // 32 bytes w/ 32 bit limbs = 8 field elements
-        let transfer_count_size = 2; // 8 bytes w/ 32 bit limbs field element
+        let hash_size = 4; // 32 bytes w/ 64 bit limbs == 4 field elements
+        let secret_size = 8; // 32 bytes w/ 32 bit limbs == 8 field elements
+        let transfer_count_size = 2; // 8 bytes w/ 32 bit limbs == 2 field element
         let total_size = hash_size + secret_size + transfer_count_size;
 
         if elements.len() != total_size {

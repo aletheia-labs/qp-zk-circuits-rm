@@ -31,13 +31,13 @@ impl TestInputs for CircuitInputs {
             .try_into()
             .unwrap();
 
-        let funding_account = BytesDigest::from(DEFAULT_FUNDING_ACCOUNT);
+        let funding_account = BytesDigest::try_from(DEFAULT_FUNDING_ACCOUNT).unwrap();
         let nullifier = Nullifier::from_preimage(&secret, DEFAULT_TRANSFER_COUNT)
             .hash
             .into();
         let secret: [u8; 32] = secret.try_into().expect("Expected 32 bytes for secret");
         let unspendable_account = UnspendableAccount::from_secret(&secret).account_id.into();
-        let exit_account = BytesDigest::from(DEFAULT_EXIT_ACCOUNT);
+        let exit_account = BytesDigest::try_from(DEFAULT_EXIT_ACCOUNT).unwrap();
 
         let storage_proof = ProcessedStorageProof::test_inputs();
         Self {
@@ -95,8 +95,8 @@ pub mod storage_proof {
 
     impl TestInputs for LeafInputs {
         fn test_inputs() -> Self {
-            let funding_account = BytesDigest::from(DEFAULT_FUNDING_ACCOUNT);
-            let to_account = BytesDigest::from(DEFAULT_TO_ACCOUNT);
+            let funding_account = BytesDigest::try_from(DEFAULT_FUNDING_ACCOUNT).unwrap();
+            let to_account = BytesDigest::try_from(DEFAULT_TO_ACCOUNT).unwrap();
             LeafInputs::new(
                 DEFAULT_TRANSFER_COUNT,
                 funding_account,

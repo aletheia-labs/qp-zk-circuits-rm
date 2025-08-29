@@ -109,7 +109,7 @@ impl StorageProof {
             .indices
             .iter()
             .map(|&i| {
-                // Divide by 16 to get the field element index instead of the hex index.
+                // Divide by 8 to get the field element index instead of the hex index.
                 let i = i / (INJECTIVE_BYTES_PER_ELEMENT * 2);
                 F::from_canonical_usize(i)
             })
@@ -315,7 +315,7 @@ impl CircuitFragment for StorageProof {
 fn bytes_32_to_hashout(bytes: [u8; 32]) -> HashOut<F> {
     use zk_circuits_common::utils::BytesDigest;
 
-    let digest = BytesDigest::from(bytes);
+    let digest = BytesDigest::try_from(bytes).unwrap();
     let elements = digest_bytes_to_felts(digest);
     HashOut { elements }
 }

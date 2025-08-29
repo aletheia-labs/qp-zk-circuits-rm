@@ -48,7 +48,7 @@ impl UnspendableAccount {
 
         if preimage.len() != PREIMAGE_NUM_TARGETS {
             panic!(
-                "Expected secret to be 80 bytes (10 field elements), got {} field elements",
+                "Expected preimage to be 80 bytes (10 field elements), got {} field elements",
                 preimage.len()
             );
         }
@@ -70,7 +70,7 @@ impl ByteCodec for UnspendableAccount {
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend(*digest_felts_to_bytes(self.account_id));
-        bytes.extend(injective_felts_to_bytes(&self.secret));
+        bytes.extend(injective_felts_to_bytes(&self.secret).unwrap());
         bytes
     }
 
@@ -198,7 +198,7 @@ impl CircuitFragment for UnspendableAccount {
         for target in preimage.iter() {
             builder.range_check(*target, 32);
         }
-        // Don't need to perform a range check no the secret since we are already donig that on the
+        // Don't need to perform a range check on the secret since we are already donig that on the
         // nullifier circuit and we ensuring the secret is the same across both circuits.
         preimage.extend(secret);
 

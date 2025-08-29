@@ -166,7 +166,7 @@ fn test_prover_and_verifier_from_file_e2e() -> Result<()> {
         public: PublicCircuitInputs {
             funding_amount,
             nullifier: Nullifier::from_preimage(&secret, 0).hash.into(),
-            root_hash: root_hash.into(),
+            root_hash: root_hash.try_into().unwrap(),
             exit_account: (*exit_account).into(),
         },
     };
@@ -296,7 +296,7 @@ fn test_prover_and_verifier_fuzzing() -> Result<()> {
                     nullifier: Nullifier::from_preimage(&secret, transfer_count_from_chain)
                         .hash
                         .into(),
-                    root_hash: state_root_bytes.into(),
+                    root_hash: state_root_bytes.try_into().unwrap(),
                     exit_account: (*exit_account).into(),
                 },
             };

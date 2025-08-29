@@ -27,16 +27,18 @@ fn proof_can_be_deserialized() {
 
     // Build the expected values
     let expected = PublicCircuitInputs {
-        funding_amount: 1_000_000_000u128,
-        nullifier: BytesDigest::from([
-            249, 127, 221, 83, 83, 197, 114, 93, 66, 94, 28, 161, 47, 60, 137, 88, 208, 169, 200,
-            58, 68, 128, 22, 53, 141, 132, 162, 150, 245, 21, 126, 118,
-        ]),
-        root_hash: BytesDigest::from([
-            220, 71, 72, 39, 216, 197, 157, 79, 168, 106, 141, 198, 230, 2, 162, 76, 154, 30, 81,
-            14, 215, 106, 199, 192, 94, 231, 216, 32, 208, 230, 111, 164,
-        ]),
-        exit_account: BytesDigest::from([4u8; 32]),
+        funding_amount: 1_000_000_000_000u128,
+        nullifier: BytesDigest::try_from([
+            169, 76, 150, 35, 66, 248, 76, 193, 57, 204, 106, 33, 169, 160, 248, 113, 235, 144,
+            212, 48, 9, 232, 146, 7, 105, 125, 170, 24, 33, 54, 135, 28,
+        ])
+        .unwrap(),
+        root_hash: BytesDigest::try_from([
+            95, 250, 42, 181, 176, 219, 152, 131, 178, 43, 30, 88, 16, 147, 46, 169, 217, 234, 177,
+            132, 7, 48, 253, 57, 172, 231, 28, 38, 187, 141, 8, 45,
+        ])
+        .unwrap(),
+        exit_account: BytesDigest::try_from([4u8; 32]).unwrap(),
     };
     assert_eq!(public_inputs, expected);
     println!("{:?}", public_inputs);
@@ -54,7 +56,7 @@ fn get_public_inputs() {
 #[test]
 #[ignore = "debug"]
 fn export_test_proof() {
-    const FILE_PATH: &str = "dummy_proof.bin";
+    const FILE_PATH: &str = "../../dummy_proof.bin";
 
     let circuit_config = CircuitConfig::standard_recursion_config();
 
@@ -68,7 +70,7 @@ fn export_test_proof() {
 #[test]
 #[ignore = "debug"]
 fn export_test_proof_zk() {
-    const FILE_PATH: &str = "dummy_proof_zk.bin";
+    const FILE_PATH: &str = "../../dummy_proof_zk.bin";
 
     let circuit_config = CircuitConfig::standard_recursion_zk_config();
 

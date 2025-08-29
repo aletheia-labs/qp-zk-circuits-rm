@@ -91,7 +91,7 @@ impl PublicCircuitInputs {
     }
 
     pub fn try_from_slice(pis: &[GoldilocksField]) -> anyhow::Result<Self> {
-        const LEAF_PI_LEN: usize = 14;
+        const LEAF_PI_LEN: usize = 16;
         // Public inputs are ordered as follows:
         // Nullifier.hash: 4 felts
         // StorageProof.root_hash: 4 felts
@@ -111,7 +111,8 @@ impl PublicCircuitInputs {
         let funding_amount = felts_to_u128(
             <[F; 4]>::try_from(&pis[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX])
                 .context("failed to deserialize funding amount")?,
-        );
+        )
+        .unwrap();
         let exit_account =
             BytesDigest::try_from(&pis[EXIT_ACCOUNT_START_INDEX..EXIT_ACCOUNT_END_INDEX])
                 .context("failed to deserialize exit account")?;
