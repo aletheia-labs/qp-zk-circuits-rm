@@ -26,15 +26,15 @@
 //!     private: PrivateCircuitInputs {
 //!         secret: [1u8; 32],
 //!         transfer_count: 0,
-//!         funding_account: [2u8; 32].into(),
+//!         funding_account: [2u8; 32].try_into().unwrap(),
 //!         storage_proof: ProcessedStorageProof::new(vec![], vec![]).unwrap(),
-//!         unspendable_account: [1u8; 32].into(),
+//!         unspendable_account: [1u8; 32].try_into().unwrap(),
 //!     },
 //!     public: PublicCircuitInputs {
 //!         funding_amount: 1000,
-//!         nullifier: [1u8; 32].into(),
-//!         root_hash: [0u8; 32].into(),
-//!         exit_account: [2u8; 32].into(),
+//!         nullifier: [1u8; 32].try_into().unwrap(),
+//!         root_hash: [0u8; 32].try_into().unwrap(),
+//!         exit_account: [2u8; 32].try_into().unwrap(),
 //!     },
 //! };
 //!
