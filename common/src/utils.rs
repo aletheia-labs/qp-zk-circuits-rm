@@ -18,7 +18,7 @@ pub type Digest = [F; DIGEST_NUM_FIELD_ELEMENTS];
 pub type PrivateKey = [F; 4];
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BytesDigest(pub [u8; 32]);
+pub struct BytesDigest([u8; 32]);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DigestError {

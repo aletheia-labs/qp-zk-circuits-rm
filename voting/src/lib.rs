@@ -271,7 +271,7 @@ mod voting_tests {
     };
     use zk_circuits_common::{
         circuit::C,
-        utils::{digest_bytes_to_felts, injective_bytes_to_felts, BytesDigest},
+        utils::{digest_bytes_to_felts, BytesDigest},
     };
 
     fn compute_nullifier(private_key: &PrivateKey, proposal_id: &Digest) -> Digest {
@@ -283,10 +283,15 @@ mod voting_tests {
     }
 
     fn create_test_inputs() -> VoteCircuitData {
-        let private_keys_for_tree = [[1u8; 32], [2u8; 32], [3u8; 32], [4u8; 32]];
+        let private_keys_for_tree: [BytesDigest; 4] = [
+            zk_circuits_common::utils::BytesDigest::try_from([1u8; 32]).unwrap(),
+            zk_circuits_common::utils::BytesDigest::try_from([2u8; 32]).unwrap(),
+            zk_circuits_common::utils::BytesDigest::try_from([3u8; 32]).unwrap(),
+            zk_circuits_common::utils::BytesDigest::try_from([4u8; 32]).unwrap(),
+        ];
         let leaves: Vec<Digest> = private_keys_for_tree
             .iter()
-            .map(|bytes| PoseidonHash::hash_no_pad(&injective_bytes_to_felts(bytes)).elements)
+            .map(|bytes| PoseidonHash::hash_no_pad(&digest_bytes_to_felts(*bytes)).elements)
             .collect();
 
         // Build the Merkle tree level by level
@@ -311,7 +316,7 @@ mod voting_tests {
         }
 
         let root = current_level[0];
-        let voter_private_key: PrivateKey = injective_bytes_to_felts(&private_keys_for_tree[0])
+        let voter_private_key: PrivateKey = digest_bytes_to_felts(private_keys_for_tree[0])
             .try_into()
             .unwrap();
         let merkle_siblings: Vec<Digest> = vec![leaves[1], merkle_tree[1][1]];

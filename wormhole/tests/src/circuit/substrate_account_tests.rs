@@ -55,7 +55,7 @@ fn test_exit_account_max_address() -> anyhow::Result<()> {
     // The max address is the byte encoding of the [F::ORDER; 4] where each field element is u64::MAX.
     let felts = [F::from_noncanonical_u64(F::ORDER - 1); 4];
     let digest_felts_to_bytes = digest_felts_to_bytes(felts);
-    let exit_account = SubstrateAccount::new(&digest_felts_to_bytes.0)?;
+    let exit_account = SubstrateAccount::new(&*digest_felts_to_bytes)?;
     let elements = exit_account.to_field_elements();
     assert_eq!(elements.len(), 4, "Expected 4 field elements");
     // Each element should be u64::MAX (0xFFFFFFFFFFFFFFFF)
