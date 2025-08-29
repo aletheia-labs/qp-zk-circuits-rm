@@ -1,3 +1,4 @@
+use alloc::{string::String, vec::Vec};
 use plonky2::{
     field::goldilocks_field::GoldilocksField,
     iop::witness::PartialWitness,

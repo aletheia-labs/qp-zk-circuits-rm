@@ -1,8 +1,4 @@
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(feature = "std")]
-use std::vec::Vec;
-
 use zk_circuits_common::circuit::F;
 
 pub trait FieldElementCodec: Sized {

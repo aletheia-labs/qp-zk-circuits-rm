@@ -1,7 +1,5 @@
 #![allow(clippy::new_without_default)]
-#[cfg(feature = "std")]
 use crate::storage_proof::ProcessedStorageProof;
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use anyhow::{anyhow, bail, Context};
 use core::ops::Deref;

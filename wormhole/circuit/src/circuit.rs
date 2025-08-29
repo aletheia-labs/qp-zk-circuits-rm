@@ -1,7 +1,6 @@
 //! Wormhole Circuit.
 //!
 //! This module defines the zero-knowledge circuit for the Wormhole protocol.
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use plonky2::{
     plonk::circuit_data::CircuitData,
