@@ -1,12 +1,8 @@
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use core::array;
 use core::mem::size_of;
-use zk_circuits_common::utils::digest_felts_to_bytes;
-
-#[cfg(feature = "std")]
-use std::vec::Vec;
 use zk_circuits_common::utils::digest_bytes_to_felts;
+use zk_circuits_common::utils::digest_felts_to_bytes;
 
 use crate::codec::ByteCodec;
 use crate::codec::FieldElementCodec;
@@ -211,7 +207,6 @@ impl NullifierTargets {
     }
 }
 
-#[cfg(feature = "std")]
 impl CircuitFragment for Nullifier {
     type Targets = NullifierTargets;
 

@@ -1,4 +1,3 @@
-#[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
 use anyhow::bail;
 use plonky2::{
@@ -7,8 +6,6 @@ use plonky2::{
     iop::target::Target,
     plonk::circuit_builder::CircuitBuilder,
 };
-#[cfg(feature = "std")]
-use std::vec::Vec;
 
 use crate::{
     inputs::CircuitInputs,
@@ -136,7 +133,6 @@ impl TryFrom<&CircuitInputs> for StorageProof {
     }
 }
 
-#[cfg(feature = "std")]
 impl CircuitFragment for StorageProof {
     type Targets = StorageProofTargets;
 
@@ -311,7 +307,6 @@ impl CircuitFragment for StorageProof {
     }
 }
 
-#[cfg(feature = "std")]
 fn bytes_32_to_hashout(bytes: [u8; 32]) -> HashOut<F> {
     use zk_circuits_common::utils::BytesDigest;
 

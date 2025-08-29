@@ -22,13 +22,12 @@ criterion = { workspace = true }
 [features]
 default = ["std", "multithread"]
 std = [
-  "anyhow/std",
-  "plonky2/std",
-  "wormhole-prover/std",
-  "wormhole-verifier/std",
-  "zk-circuits-common/std",
+    "anyhow/std",
+    "plonky2/std",
+    "wormhole-prover/std",
+    "wormhole-verifier/std",
+    "zk-circuits-common/std",
 ]
-no_std = []
 no_zk = []
 multithread = ["rayon"]
 

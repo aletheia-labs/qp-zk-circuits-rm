@@ -1,12 +1,8 @@
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
-#[cfg(not(feature = "std"))]
 use core::array;
 use plonky2::{
     hash::hash_types::HashOutTarget, iop::target::Target, plonk::circuit_builder::CircuitBuilder,
 };
-#[cfg(feature = "std")]
-use std::array;
 
 use crate::codec::ByteCodec;
 use crate::inputs::CircuitInputs;

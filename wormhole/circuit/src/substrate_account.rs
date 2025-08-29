@@ -1,9 +1,6 @@
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use core::ops::Deref;
-#[cfg(feature = "std")]
 use plonky2::iop::witness::PartialWitness;
-#[cfg(feature = "std")]
 use zk_circuits_common::circuit::CircuitFragment;
 
 use crate::codec::{ByteCodec, FieldElementCodec};
@@ -84,7 +81,6 @@ impl ExitAccountTargets {
     }
 }
 
-#[cfg(feature = "std")]
 impl CircuitFragment for SubstrateAccount {
     type Targets = ExitAccountTargets;
 

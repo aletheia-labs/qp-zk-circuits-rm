@@ -1,8 +1,5 @@
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 use core::mem::size_of;
-#[cfg(feature = "std")]
-use std::vec::Vec;
 
 use plonky2::{
     hash::{hash_types::HashOutTarget, poseidon::PoseidonHash},
@@ -178,7 +175,6 @@ impl UnspendableAccountTargets {
     }
 }
 
-#[cfg(feature = "std")]
 impl CircuitFragment for UnspendableAccount {
     type Targets = UnspendableAccountTargets;
 

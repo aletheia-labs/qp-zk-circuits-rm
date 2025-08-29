@@ -1,8 +1,6 @@
 #![allow(clippy::new_without_default)]
-#[cfg(feature = "std")]
 use crate::storage_proof::ProcessedStorageProof;
-#[cfg(not(feature = "std"))]
-use anyhow::{anyhow, bail, Context};
+use alloc::vec::Vec;
 use anyhow::{bail, Context};
 use plonky2::field::goldilocks_field::GoldilocksField;
 use plonky2::plonk::proof::ProofWithPublicInputs;

@@ -1,11 +1,7 @@
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-use core::ops::Deref;
-#[cfg(feature = "std")]
-use std::vec::Vec;
-
 use crate::circuit::F;
+use alloc::vec::Vec;
 use anyhow::anyhow;
+use core::ops::Deref;
 use plonky2::field::types::{Field, Field64, PrimeField64};
 use plonky2::hash::hash_types::HashOut;
 
