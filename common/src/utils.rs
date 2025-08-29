@@ -148,11 +148,11 @@ pub fn injective_string_to_felt(input: &str) -> [F; 2] {
 pub fn injective_bytes_to_felts(input: &[u8]) -> Vec<F> {
     let mut field_elements: Vec<F> = Vec::new();
     for chunk in input.chunks(INJECTIVE_BYTES_PER_ELEMENT) {
-        let mut bytes = [0u8; 8];
+        let mut bytes = [0u8; INJECTIVE_BYTES_PER_ELEMENT];
         bytes[..chunk.len()].copy_from_slice(chunk);
         // Convert the chunk to a field element.
-        let value = u64::from_le_bytes(bytes);
-        let field_element = F::from_noncanonical_u64(value);
+        let value = u32::from_le_bytes(bytes);
+        let field_element = F::from_noncanonical_u64(value as u64);
         field_elements.push(field_element);
     }
 
@@ -165,7 +165,7 @@ pub fn injective_felts_to_bytes(input: &[F]) -> Vec<u8> {
 
     for field_element in input {
         let value = field_element.to_noncanonical_u64();
-        let value_bytes = &value.to_le_bytes()[..4];
+        let value_bytes = &value.to_le_bytes()[..INJECTIVE_BYTES_PER_ELEMENT];
         bytes.extend_from_slice(value_bytes);
     }
 

@@ -164,13 +164,16 @@ impl CircuitFragment for StorageProof {
         let leaf_inputs_hash =
             builder.hash_n_to_hash_no_pad::<PoseidonHash>(leaf_inputs.collect_to_vec());
 
+        // constant 2^32 for (lo + hi * 2^32) reconstruction
+        let two_pow_32 = builder.constant(F::from_canonical_u64(1u64 << 32));
+
         // The first node should be the root node so we initialize `prev_hash` to the provided `root_hash`.
         let mut prev_hash = root_hash;
         let n_log = (usize::BITS - (MAX_PROOF_LEN - 1).leading_zeros()) as usize;
         for i in 0..MAX_PROOF_LEN {
             let node = &proof_data[i];
 
-            // Chech if this is a valid proof node or a dummy one.
+            // Check if this is a valid proof node or a dummy one.
             let is_proof_node = is_const_less_than(builder, i, proof_len, n_log);
 
             // Check if this is a leaf node.
@@ -202,9 +205,28 @@ impl CircuitFragment for StorageProof {
                 let is_start_of_hash = builder.is_equal(felt_index, expected_hash_index);
 
                 // If this is the start of the hash, set the next 4 felts of `found_hash`.
-                for (hash_i, felt) in found_hash.iter_mut().enumerate() {
-                    *felt = builder.select(is_start_of_hash, node[j + hash_i], *felt);
-                }
+                // Combine pairs (lo, hi) -> lo + hi * 2^32 (little-endian)
+                let mut combine_le_32x2 = |lo: Target, hi: Target| {
+                    let hi_shifted = builder.mul(hi, two_pow_32);
+                    builder.add(lo, hi_shifted)
+                };
+
+                // Reconstruct the 4 hash elements from the next 8 felts (32-bit limbs).
+                // Layout (little-endian pairs):
+                // h0 = node[j+0] (lo) , node[j+1] (hi)
+                // h1 = node[j+2] (lo) , node[j+3] (hi)
+                // h2 = node[j+4] (lo) , node[j+5] (hi)
+                // h3 = node[j+6] (lo) , node[j+7] (hi)
+                let h0 = combine_le_32x2(node[j], node[j + 1]);
+                let h1 = combine_le_32x2(node[j + 2], node[j + 3]);
+                let h2 = combine_le_32x2(node[j + 4], node[j + 5]);
+                let h3 = combine_le_32x2(node[j + 6], node[j + 7]);
+
+                // If this is the start of the hash, set the 4 reconstructed felts into found_hash.
+                found_hash[0] = builder.select(is_start_of_hash, h0, found_hash[0]);
+                found_hash[1] = builder.select(is_start_of_hash, h1, found_hash[1]);
+                found_hash[2] = builder.select(is_start_of_hash, h2, found_hash[2]);
+                found_hash[3] = builder.select(is_start_of_hash, h3, found_hash[3]);
             }
             // Range check the last 8 felts of the node to be 32 bits.
             for felt in node.iter().skip(PROOF_NODE_MAX_SIZE_F - 8) {
