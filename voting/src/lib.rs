@@ -316,9 +316,7 @@ mod voting_tests {
         }
 
         let root = current_level[0];
-        let voter_private_key: PrivateKey = digest_bytes_to_felts(private_keys_for_tree[0])
-            .try_into()
-            .unwrap();
+        let voter_private_key: PrivateKey = digest_bytes_to_felts(private_keys_for_tree[0]);
         let merkle_siblings: Vec<Digest> = vec![leaves[1], merkle_tree[1][1]];
         let path_indices: Vec<bool> = vec![false, false];
         let actual_merkle_depth = 2;
