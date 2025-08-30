@@ -120,10 +120,14 @@ pub mod circuit_logic {
         }
 
         // Transfer count.
-        builder.connect(
-            targets.storage_proof.leaf_inputs.transfer_count,
-            targets.nullifier.transfer_count,
-        );
+        for (&a, &b) in targets
+            .nullifier
+            .transfer_count
+            .iter()
+            .zip(&targets.storage_proof.leaf_inputs.transfer_count)
+        {
+            builder.connect(a, b);
+        }
 
         // to_account and unspendable_account must be the same
         builder.connect_hashes(

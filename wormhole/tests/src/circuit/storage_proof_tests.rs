@@ -4,7 +4,10 @@ use wormhole_circuit::{
     storage_proof::{leaf::LeafInputs, ProcessedStorageProof, StorageProof, StorageProofTargets},
     substrate_account::SubstrateAccount,
 };
-use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
+use zk_circuits_common::{
+    circuit::{CircuitFragment, C, D, F},
+    utils::u64_to_felts,
+};
 
 use test_helpers::storage_proof::{default_root_hash, TestInputs};
 
@@ -56,7 +59,7 @@ fn invalid_nonce() {
     let mut leaf_inputs = LeafInputs::test_inputs();
 
     // Alter the nonce.
-    leaf_inputs.transfer_count = F::from_noncanonical_u64(5);
+    leaf_inputs.transfer_count = u64_to_felts(5);
 
     let proof = StorageProof::new(&proof, default_root_hash(), leaf_inputs);
 
@@ -84,7 +87,12 @@ fn invalid_funding_amount() {
     let mut leaf_inputs = LeafInputs::test_inputs();
 
     // Alter the funding amount.
-    leaf_inputs.funding_amount = [F::from_canonical_u64(1000), F::from_canonical_u64(0)];
+    leaf_inputs.funding_amount = [
+        F::from_canonical_u64(1000),
+        F::from_canonical_u64(0),
+        F::from_canonical_u64(0),
+        F::from_canonical_u64(0),
+    ];
 
     let proof = StorageProof::new(&proof, default_root_hash(), leaf_inputs);
 

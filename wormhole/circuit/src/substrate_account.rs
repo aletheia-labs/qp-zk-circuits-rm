@@ -3,16 +3,15 @@ use core::ops::Deref;
 use plonky2::iop::witness::PartialWitness;
 use zk_circuits_common::circuit::CircuitFragment;
 
-use crate::{
-    codec::{ByteCodec, FieldElementCodec},
-    inputs::BytesDigest,
-};
+use crate::codec::{ByteCodec, FieldElementCodec};
 use plonky2::{
     hash::hash_types::HashOutTarget, iop::witness::WitnessWrite,
     plonk::circuit_builder::CircuitBuilder,
 };
 use zk_circuits_common::circuit::{D, F};
-use zk_circuits_common::utils::{bytes_to_felts, felts_to_bytes, fixed_bytes_to_felts, Digest};
+use zk_circuits_common::utils::{
+    digest_bytes_to_felts, digest_felts_to_bytes, BytesDigest, Digest,
+};
 
 #[derive(Debug, Default, Eq, PartialEq, Clone, Copy)]
 pub struct SubstrateAccount(pub Digest);
@@ -25,13 +24,12 @@ impl SubstrateAccount {
 
 impl ByteCodec for SubstrateAccount {
     fn to_bytes(&self) -> Vec<u8> {
-        felts_to_bytes(&self.0)
+        digest_felts_to_bytes(self.0).to_vec()
     }
 
     fn from_bytes(slice: &[u8]) -> anyhow::Result<Self> {
-        let address = bytes_to_felts(slice).try_into().map_err(|_| {
-            anyhow::anyhow!("failed to deserialize bytes into exit account address")
-        })?;
+        let bytes = BytesDigest::try_from(slice).unwrap();
+        let address = digest_bytes_to_felts(bytes);
         Ok(SubstrateAccount(address))
     }
 }
@@ -65,7 +63,7 @@ impl Deref for SubstrateAccount {
 
 impl From<BytesDigest> for SubstrateAccount {
     fn from(value: BytesDigest) -> Self {
-        let felts = fixed_bytes_to_felts(*value);
+        let felts = digest_bytes_to_felts(value);
         SubstrateAccount(felts)
     }
 }

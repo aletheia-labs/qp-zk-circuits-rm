@@ -1,12 +1,11 @@
 #![allow(clippy::new_without_default)]
 use crate::storage_proof::ProcessedStorageProof;
 use alloc::vec::Vec;
-use anyhow::{anyhow, bail, Context};
-use core::ops::Deref;
+use anyhow::{bail, Context};
 use plonky2::field::goldilocks_field::GoldilocksField;
 use plonky2::plonk::proof::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
-use zk_circuits_common::utils::{felts_to_bytes, felts_to_u128, fixed_felts_to_bytes, Digest};
+use zk_circuits_common::utils::{felts_to_u128, BytesDigest};
 
 /// The total size of the public inputs field element vector.
 pub const PUBLIC_INPUTS_FELTS_LEN: usize = 14;
@@ -15,63 +14,9 @@ pub const NULLIFIER_END_INDEX: usize = 4;
 pub const ROOT_HASH_START_INDEX: usize = 4;
 pub const ROOT_HASH_END_INDEX: usize = 8;
 pub const FUNDING_AMOUNT_START_INDEX: usize = 8;
-pub const FUNDING_AMOUNT_END_INDEX: usize = 10;
-pub const EXIT_ACCOUNT_START_INDEX: usize = 10;
-pub const EXIT_ACCOUNT_END_INDEX: usize = 14;
-
-/// A bytes digest containing various helpful methods for converting between
-/// field element digests and byte digests.
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BytesDigest(pub [u8; 32]);
-
-impl From<[u8; 32]> for BytesDigest {
-    fn from(value: [u8; 32]) -> Self {
-        Self(value)
-    }
-}
-
-impl TryFrom<&[u8]> for BytesDigest {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let bytes = value.try_into().map_err(|_| {
-            anyhow!(
-                "failed to deserialize bytes digest from byte vector. Expected length 32, got {}",
-                value.len()
-            )
-        })?;
-        Ok(Self(bytes))
-    }
-}
-
-impl From<Digest> for BytesDigest {
-    fn from(value: Digest) -> Self {
-        let bytes = fixed_felts_to_bytes(value);
-        Self(bytes)
-    }
-}
-
-impl TryFrom<&[F]> for BytesDigest {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &[F]) -> Result<Self, Self::Error> {
-        let bytes = felts_to_bytes(value).try_into().map_err(|_| {
-            anyhow!(
-                "failed to deserialize bytes digest from field elements. Expected length 4, got {}",
-                value.len()
-            )
-        })?;
-        Ok(Self(bytes))
-    }
-}
-
-impl Deref for BytesDigest {
-    type Target = [u8; 32];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+pub const FUNDING_AMOUNT_END_INDEX: usize = 12;
+pub const EXIT_ACCOUNT_START_INDEX: usize = 12;
+pub const EXIT_ACCOUNT_END_INDEX: usize = 16;
 
 /// Inputs required to commit to the wormhole circuit.
 #[derive(Debug, Clone)]
@@ -144,11 +89,11 @@ impl PublicCircuitInputs {
     }
 
     pub fn try_from_slice(pis: &[GoldilocksField]) -> anyhow::Result<Self> {
-        const LEAF_PI_LEN: usize = 14;
+        const LEAF_PI_LEN: usize = 16;
         // Public inputs are ordered as follows:
         // Nullifier.hash: 4 felts
         // StorageProof.root_hash: 4 felts
-        // StorageProof.funding_amount: 2 felts
+        // StorageProof.funding_amount: 4 felts
         // ExitAccount.address: 4 felts
         if pis.len() != LEAF_PI_LEN {
             bail!(
@@ -162,9 +107,10 @@ impl PublicCircuitInputs {
         let root_hash = BytesDigest::try_from(&pis[ROOT_HASH_START_INDEX..ROOT_HASH_END_INDEX])
             .context("failed to deserialize root hash")?;
         let funding_amount = felts_to_u128(
-            <[F; 2]>::try_from(&pis[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX])
+            <[F; 4]>::try_from(&pis[FUNDING_AMOUNT_START_INDEX..FUNDING_AMOUNT_END_INDEX])
                 .context("failed to deserialize funding amount")?,
-        );
+        )
+        .unwrap();
         let exit_account =
             BytesDigest::try_from(&pis[EXIT_ACCOUNT_START_INDEX..EXIT_ACCOUNT_END_INDEX])
                 .context("failed to deserialize exit account")?;

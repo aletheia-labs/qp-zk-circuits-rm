@@ -5,7 +5,7 @@ use wormhole_circuit::{
     nullifier::{Nullifier, NullifierTargets},
 };
 use zk_circuits_common::circuit::{CircuitFragment, C, D, F};
-use zk_circuits_common::utils::bytes_to_felts;
+use zk_circuits_common::utils::injective_bytes_to_felts;
 
 #[cfg(test)]
 fn run_test(nullifier: &Nullifier) -> anyhow::Result<ProofWithPublicInputs<F, C, D>> {
@@ -41,7 +41,7 @@ fn invalid_secret_fails_proof() {
     // Flip the first byte of the preimage.
     let mut invalid_bytes = hex::decode(DEFAULT_SECRET).unwrap();
     invalid_bytes[0] ^= 0xFF;
-    valid_nullifier.secret = bytes_to_felts(&invalid_bytes);
+    valid_nullifier.secret = injective_bytes_to_felts(&invalid_bytes);
 
     let res = run_test(&valid_nullifier);
     assert!(res.is_err());
@@ -61,7 +61,7 @@ fn nullifier_codec() {
 
     // Encode the account as field elements and compare.
     let field_elements = nullifier.to_field_elements();
-    assert_eq!(field_elements.len(), 9);
+    assert_eq!(field_elements.len(), 14);
 
     // Decode the field elements back into a Nullifier
     let recovered_nullifier = Nullifier::from_field_elements(&field_elements).unwrap();
@@ -76,7 +76,7 @@ fn codec_invalid_length() {
     assert!(recovered_nullifier_result.is_err());
     assert_eq!(
         recovered_nullifier_result.unwrap_err().to_string(),
-        "Expected 9 field elements for Nullifier, got: 2"
+        "Expected 14 field elements for Nullifier, got: 2"
     );
 }
 
@@ -88,6 +88,6 @@ fn codec_empty_elements() {
     assert!(recovered_nullifier_result.is_err());
     assert_eq!(
         recovered_nullifier_result.unwrap_err().to_string(),
-        "Expected 9 field elements for Nullifier, got: 0"
+        "Expected 14 field elements for Nullifier, got: 0"
     );
 }
