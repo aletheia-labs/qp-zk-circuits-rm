@@ -8,6 +8,7 @@ members = [
     "wormhole/tests",
     "wormhole/tests/test-helpers",
     "wormhole/verifier",
+    "wormhole/example",
     "voting",
 ]
 resolver = "2"
