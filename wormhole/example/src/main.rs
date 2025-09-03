@@ -9,7 +9,7 @@ use wormhole_circuit::substrate_account::SubstrateAccount;
 use wormhole_circuit::unspendable_account::UnspendableAccount;
 use wormhole_prover::WormholeProver;
 use zk_circuits_common::circuit::F;
-use zk_circuits_common::utils::{felts_to_bytes, u128_to_felts};
+use zk_circuits_common::utils::{digest_felts_to_bytes, u128_to_felts, u64_to_felts};
 
 fn main() -> anyhow::Result<()> {
     // Create inputs. In practice, each input would be gathered from the real node.
@@ -20,14 +20,12 @@ fn main() -> anyhow::Result<()> {
     let transfer_count = 0u64;
 
     let mut leaf_inputs_felts = Vec::new();
-    leaf_inputs_felts.push(F::from_noncanonical_u64(transfer_count));
+    leaf_inputs_felts.extend(&u64_to_felts(transfer_count));
     leaf_inputs_felts.extend_from_slice(&funding_account.0);
     leaf_inputs_felts.extend_from_slice(&unspendable_account);
     leaf_inputs_felts.extend_from_slice(&u128_to_felts(funding_amount));
     let leaf_inputs_hash = PoseidonHash::hash_no_pad(&leaf_inputs_felts);
-    let root_hash: [u8; 32] = felts_to_bytes(&leaf_inputs_hash.elements)
-        .try_into()
-        .unwrap();
+    let root_hash = digest_felts_to_bytes(leaf_inputs_hash.elements);
 
     let exit_account = SubstrateAccount::new(&[2u8; 32])?;
 
@@ -42,7 +40,7 @@ fn main() -> anyhow::Result<()> {
         public: PublicCircuitInputs {
             funding_amount: funding_amount,
             nullifier: Nullifier::from_preimage(&secret, 0).hash.into(),
-            root_hash: root_hash.into(),
+            root_hash,
             exit_account: (*exit_account).into(),
         },
     };
@@ -52,9 +50,13 @@ fn main() -> anyhow::Result<()> {
     let prover_next = prover.commit(&inputs)?;
     let proof = prover_next.prove().expect("proof failed; qed");
 
+    let public_inputs = PublicCircuitInputs::try_from(&proof)?;
+    // print the public inputs
+    println!("{:?}", public_inputs);
+
     // write the proof as hex
     let proof_hex = hex::encode(proof.to_bytes());
-
-    println!("{}", proof_hex);
+    // store the proof hex to file
+    std::fs::write("proof_from_bins.hex", proof_hex)?;
     Ok(())
 }
