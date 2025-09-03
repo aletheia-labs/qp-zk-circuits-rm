@@ -1131,6 +1131,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "wormhole-example"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "plonky2",
+ "wormhole-circuit",
+ "wormhole-prover",
+ "zk-circuits-common",
+]
+
+[[package]]
 name = "wormhole-prover"
 version = "0.1.0"
 dependencies = [
