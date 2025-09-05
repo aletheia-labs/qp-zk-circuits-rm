@@ -1,0 +1,112 @@
+---
+    name: Continuous Integration
+    
+    on:
+      pull_request:
+        paths-ignore:
+          - "docs/**"
+          - "*.md"
+          - "LICENSE"
+      push:
+        branches:
+          - main
+        paths-ignore:
+          - "docs/**"
+          - "*.md"
+          - "LICENSE"
+    
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    
+    env:
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+      CARGO_NET_RETRY: 10
+      CARGO_NET_TIMEOUT: 60
+    
+    jobs:
+      fast-checks:
+        name: 🏁 Fast Checks (Format)
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install required components
+            run: rustup component add rustfmt --toolchain nightly
+          - name: Install taplo
+            run: cargo install taplo-cli --locked
+          - name: Run format checks
+            run: |
+              taplo format --check --config taplo.toml
+              cargo +nightly fmt --all -- --check
+    
+      test-workspace:
+        name: 🧪 Test Workspace
+        needs: fast-checks
+        runs-on: ${{ matrix.os }}
+        timeout-minutes: 30
+        strategy:
+          fail-fast: false
+          matrix:
+            os:
+              - ubuntu-latest
+              - macos-latest
+            rust:
+              - stable
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install Rust ${{ matrix.rust }}
+            uses: dtolnay/rust-toolchain@master
+            with:
+              toolchain: ${{ matrix.rust }}
+          - name: Cache Rust dependencies
+            uses: Swatinem/rust-cache@v2
+          - name: Test workspace (release, fast tests)
+            run: cargo test --workspace --locked --release --lib --bins -- --skip aggregator_tests --skip circuit_data_tests --skip storage_proof_tests --skip prover_tests --skip verifier_tests
+    
+      analysis:
+        name: 🤖 Analysis (Clippy & Doc)
+        needs: fast-checks
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install Rust stable
+            uses: dtolnay/rust-toolchain@stable
+            with:
+              components: clippy, rust-src
+          - name: Cache Rust dependencies
+            uses: Swatinem/rust-cache@v2
+          - name: Run clippy (workspace)
+            run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+          - name: Check documentation
+            run: cargo doc --workspace --locked --no-deps --all-features --document-private-items
+    
+      slow-tests:
+        name: 🐌 Slow Tests (Crypto-heavy)
+        needs: fast-checks
+        runs-on: ubuntu-latest
+        timeout-minutes: 60
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install Rust stable
+            uses: dtolnay/rust-toolchain@stable
+          - name: Cache Rust dependencies
+            uses: Swatinem/rust-cache@v2
+          - name: Run slow crypto tests
+            run: |
+              cargo test --release -p tests -- aggregator_tests circuit_data_tests storage_proof_tests prover_tests verifier_tests
+              cargo test --release -p wormhole-aggregator "tree::tests"
+
+      security-audit:
+        name: 🔒 Security Audit
+        needs: fast-checks
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+          - uses: actions/checkout@v4
+          - name: Install cargo-audit
+            run: cargo install cargo-audit --locked
+          - name: Run security audit
+            run: cargo audit
