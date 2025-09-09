@@ -1,13 +1,13 @@
 [package]
-name = "circuit-builder"
-version = "0.1.0"
 edition = "2021"
+name = "circuit-builder"
 publish = false
+version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true, features = ["std"] }
-wormhole-circuit = { path = "../circuit", default-features = false, features = [
-  "std",
-] }
 qp-plonky2 = { workspace = true, features = ["default"] }
+wormhole-circuit = { path = "../circuit", default-features = false, features = [
+	"std",
+] }
 zk-circuits-common = { path = "../../common" }
