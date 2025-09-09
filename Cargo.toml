@@ -23,7 +23,7 @@ hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 
 [workspace.package]
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["Quantus Network"]
 description = "Wormhole circuit implementation using Plonky2"
