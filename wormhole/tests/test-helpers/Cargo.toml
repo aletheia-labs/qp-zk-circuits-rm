@@ -6,5 +6,5 @@ version = "0.1.0"
 [dependencies]
 hex = { workspace = true }
 qp-plonky2 = { workspace = true, default-features = true }
-wormhole-circuit = { path = "../../circuit" }
-zk-circuits-common = { path = "../../../common" }
+wormhole-circuit = { package = "al-wormhole-circuit", path = "../../circuit" }
+zk-circuits-common = { package = "al-zk-circuits-common", path = "../../../common" }

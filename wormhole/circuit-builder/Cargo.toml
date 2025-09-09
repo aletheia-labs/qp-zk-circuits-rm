@@ -1,13 +1,13 @@
 [package]
 edition = "2021"
-name = "circuit-builder"
-publish = false
+name = "al-wormhole-circuit-builder"
+publish = true
 version = "0.1.0"
 
 [dependencies]
 anyhow = { workspace = true, features = ["std"] }
 qp-plonky2 = { workspace = true, features = ["default"] }
-wormhole-circuit = { path = "../circuit", default-features = false, features = [
+wormhole-circuit = { package = "al-wormhole-circuit", path = "../circuit", default-features = false, features = [
 	"std",
 ] }
-zk-circuits-common = { path = "../../common" }
+zk-circuits-common = { package = "al-zk-circuits-common", path = "../../common" }

@@ -3,14 +3,14 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-name = "wormhole-prover"
+name = "al-wormhole-prover"
 version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 qp-plonky2 = { workspace = true }
-wormhole-circuit = { version = "0.0.1", path = "../circuit" }
-zk-circuits-common = { version = "0.0.1", path = "../../common" }
+wormhole-circuit = { package = "al-wormhole-circuit", path = "../circuit" }
+zk-circuits-common = { package = "al-zk-circuits-common", path = "../../common" }
 
 [dev-dependencies]
 criterion = { workspace = true }

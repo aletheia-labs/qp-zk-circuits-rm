@@ -3,18 +3,18 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-name = "wormhole-verifier"
+name = "al-wormhole-verifier"
 version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 qp-plonky2 = { workspace = true, default-features = false }
-wormhole-circuit = { version = "0.0.1", path = "../circuit", default-features = false }
-zk-circuits-common = { version = "0.0.1", path = "../../common", default-features = false }
+wormhole-circuit = { package = "al-wormhole-circuit", path = "../circuit", default-features = false }
+zk-circuits-common = { package = "al-zk-circuits-common", path = "../../common", default-features = false }
 
 [dev-dependencies]
 criterion = { workspace = true }
-wormhole-prover = { path = "../prover" }
+al-wormhole-prover = { path = "../prover" }
 
 [features]
 default = ["std"]

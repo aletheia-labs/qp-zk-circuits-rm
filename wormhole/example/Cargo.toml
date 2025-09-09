@@ -8,8 +8,8 @@ version = "0.1.0"
 anyhow = { workspace = true, features = ["std"] }
 hex = { workspace = true, features = ["alloc"] }
 qp-plonky2 = { workspace = true, features = ["default"] }
-wormhole-circuit = { path = "../circuit", default-features = false, features = [
+wormhole-circuit = { package = "al-wormhole-circuit", path = "../circuit", default-features = false, features = [
 	"std",
 ] }
-wormhole-prover = { path = "../prover", default-features = false }
-zk-circuits-common = { path = "../../common" }
+wormhole-prover = { package = "al-wormhole-prover", path = "../prover", default-features = false }
+zk-circuits-common = { package = "al-zk-circuits-common", path = "../../common" }

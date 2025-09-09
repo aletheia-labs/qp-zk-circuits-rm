@@ -141,22 +141,50 @@ jobs:
           echo "Updating [workspace.package] version in Cargo.toml to: $new_cargo_version"
           sed -i -E "s/^(version\s*=\s*)\"[0-9a-zA-Z.-]+\"/\\1\"$new_cargo_version\"/" Cargo.toml
 
-          # Update internal dependency versions alongside path for publishable crates
-          echo "Injecting internal dependency versions for crates to be published"
+          # Helper to set or insert version in dependency table (idempotent for one-line deps)
+          set_dep_version() {
+            local file="$1" dep="$2" ver="$3"
+            # If version exists inside the dependency braces, replace it
+            sed -i -E "/^${dep}\\s*=\\s*\\{[^}]*version\\s*=/ s/(version\\s*=\\s*\")[^"]*(\".*)/\\1${ver}\\2/" "$file"
+            # If version not present, insert after opening brace
+            sed -i -E "s#(^${dep}\\s*=\\s*\\{)#\\1 version = \"${ver}\",#" "$file"
+          }
+
+          echo "Injecting internal dependency versions across workspace"
 
           # wormhole/circuit depends on zk-circuits-common
-          sed -i -E "s#^(zk-circuits-common\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/circuit/Cargo.toml
+          set_dep_version wormhole/circuit/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/prover depends on wormhole-circuit and zk-circuits-common
-          sed -i -E "s#^(wormhole-circuit\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/prover/Cargo.toml
-          sed -i -E "s#^(zk-circuits-common\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/prover/Cargo.toml
+          set_dep_version wormhole/prover/Cargo.toml wormhole-circuit "$new_cargo_version"
+          set_dep_version wormhole/prover/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/verifier depends on zk-circuits-common and wormhole-circuit
-          sed -i -E "s#^(zk-circuits-common\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/verifier/Cargo.toml
-          sed -i -E "s#^(wormhole-circuit\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/verifier/Cargo.toml
+          set_dep_version wormhole/verifier/Cargo.toml zk-circuits-common "$new_cargo_version"
+          set_dep_version wormhole/verifier/Cargo.toml wormhole-circuit "$new_cargo_version"
 
           # voting depends on zk-circuits-common
-          sed -i -E "s#^(zk-circuits-common\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" voting/Cargo.toml
+          set_dep_version voting/Cargo.toml zk-circuits-common "$new_cargo_version"
+
+          # wormhole/aggregator depends on internal crates
+          set_dep_version wormhole/aggregator/Cargo.toml wormhole-prover "$new_cargo_version"
+          set_dep_version wormhole/aggregator/Cargo.toml wormhole-verifier "$new_cargo_version"
+          set_dep_version wormhole/aggregator/Cargo.toml wormhole-circuit "$new_cargo_version"
+          set_dep_version wormhole/aggregator/Cargo.toml zk-circuits-common "$new_cargo_version"
+
+          # Non-published crates: example, circuit-builder, tests, test-helpers (for consistency)
+          set_dep_version wormhole/example/Cargo.toml wormhole-circuit "$new_cargo_version"
+          set_dep_version wormhole/example/Cargo.toml wormhole-prover "$new_cargo_version"
+          set_dep_version wormhole/example/Cargo.toml zk-circuits-common "$new_cargo_version"
+          set_dep_version wormhole/circuit-builder/Cargo.toml wormhole-circuit "$new_cargo_version"
+          set_dep_version wormhole/circuit-builder/Cargo.toml zk-circuits-common "$new_cargo_version"
+          set_dep_version wormhole/tests/Cargo.toml wormhole-aggregator "$new_cargo_version"
+          set_dep_version wormhole/tests/Cargo.toml wormhole-circuit "$new_cargo_version"
+          set_dep_version wormhole/tests/Cargo.toml wormhole-prover "$new_cargo_version"
+          set_dep_version wormhole/tests/Cargo.toml wormhole-verifier "$new_cargo_version"
+          set_dep_version wormhole/tests/Cargo.toml zk-circuits-common "$new_cargo_version"
+          set_dep_version wormhole/tests/test-helpers/Cargo.toml wormhole-circuit "$new_cargo_version"
+          set_dep_version wormhole/tests/test-helpers/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/aggregator depends on multiple internal crates
           sed -i -E "s#^(wormhole-prover\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/aggregator/Cargo.toml
@@ -186,7 +214,7 @@ jobs:
           PR_TITLE="ci: Automate workspace version bump to $NEW_VERSION"
 
           # Prepare labels
-          PR_LABELS="automated,workspace-release-proposal"
+          PR_LABELS="automated,release-proposal"
           if [[ "${{ github.event.inputs.is_draft }}" == "true" ]]; then
             PR_LABELS="$PR_LABELS,draft-release"
           fi
