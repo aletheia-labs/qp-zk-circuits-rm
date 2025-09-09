@@ -27,6 +27,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Quantus Network"]
 description = "Wormhole circuit implementation using Plonky2"
+repository = "https://github.com/aletheia-labs/qp-zk-circuits-rm"
+keywords = ["zk", "circuits", "plonky2", "wormhole"]
+categories = ["cryptography"]
 license = "MIT"
 
 [workspace.lints.clippy]
