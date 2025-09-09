@@ -167,6 +167,14 @@ jobs:
           # Ensure lockfile updated
           cargo update -w
 
+          # Install formatters
+          rustup component add rustfmt --toolchain nightly
+          cargo install taplo-cli --locked
+
+          # Format TOML and Rust code to satisfy CI checks
+          taplo format --config taplo.toml
+          cargo +nightly fmt --all
+
           # Commit changes
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
