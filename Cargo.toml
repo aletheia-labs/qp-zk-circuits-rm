@@ -30,7 +30,7 @@ edition = "2021"
 keywords = ["circuits", "plonky2", "wormhole", "zk"]
 license = "MIT"
 repository = "https://github.com/aletheia-labs/qp-zk-circuits-rm"
-version = "0.1.0"
+version = "0.0.1"
 
 [workspace.lints.clippy]
 uninlined_format_args = "allow"

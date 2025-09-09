@@ -9,8 +9,8 @@ version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 qp-plonky2 = { workspace = true, default-features = false }
-wormhole-circuit = { path = "../circuit", default-features = false }
-zk-circuits-common = { path = "../../common", default-features = false }
+wormhole-circuit = { version = "0.0.1",  path = "../circuit", default-features = false }
+zk-circuits-common = { version = "0.0.1",  path = "../../common", default-features = false }
 
 [dev-dependencies]
 criterion = { workspace = true }
