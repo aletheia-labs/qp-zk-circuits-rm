@@ -153,8 +153,11 @@ jobs:
           # Use sed to update version = "old" to version = "new" in dependency lines
           find . -name "Cargo.toml" -exec sed -i -E "s/(version = \")[0-9]+\\.[0-9]+\\.[0-9]+(\", path = )/\\1$new_cargo_version\\2/g" {} \;
 
+          # Update lockfile for workspace packages only
+          cargo update -w
+          
           # Verify workspace compiles after version changes
-          cargo check --workspace --locked
+          cargo check --workspace
 
           # Install formatters
           rustup component add rustfmt --toolchain nightly
