@@ -97,7 +97,7 @@
           - name: Run slow crypto tests
             run: |
               cargo test --release -p tests -- aggregator_tests circuit_data_tests storage_proof_tests prover_tests verifier_tests
-              cargo test --release -p wormhole-aggregator "tree::tests"
+              cargo test --release -p al-wormhole-aggregator "tree::tests"
 
       security-audit:
         name: 🔒 Security Audit
