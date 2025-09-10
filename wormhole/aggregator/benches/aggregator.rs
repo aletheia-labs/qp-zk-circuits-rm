@@ -1,7 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use plonky2::plonk::circuit_data::CommonCircuitData;
 use al_wormhole_aggregator::aggregator::WormholeProofAggregator;
 use al_wormhole_aggregator::circuits::tree::TreeAggregationConfig;
+use criterion::{criterion_group, criterion_main, Criterion};
+use plonky2::plonk::circuit_data::CommonCircuitData;
 use wormhole_verifier::ProofWithPublicInputs;
 use zk_circuits_common::circuit::{C, D, F};
 

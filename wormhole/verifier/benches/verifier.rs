@@ -1,11 +1,11 @@
 use std::fs;
 use std::time::Duration;
 
+use al_wormhole_verifier::WormholeVerifier;
 use criterion::{criterion_group, criterion_main, Criterion};
 use plonky2::plonk::circuit_data::{CircuitConfig, CommonCircuitData, VerifierCircuitData};
 use plonky2::plonk::proof::ProofWithPublicInputs;
 use plonky2::util::serialization::DefaultGateSerializer;
-use al_wormhole_verifier::WormholeVerifier;
 
 const MEASUREMENT_TIME_S: u64 = 20;
 const DATA_PATH: &str = "../bench-data";
