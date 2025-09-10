@@ -142,52 +142,36 @@ jobs:
           # Portable regex: avoid capturing groups and \s; use POSIX classes
           sed -i -E 's/^version[[:space:]]*=[[:space:]]*"[^"]*"/version = "'$new_cargo_version'"/' Cargo.toml
 
-          echo "Injecting internal dependency versions across workspace"
+          echo "Installing cargo-edit for version management"
+          cargo install cargo-edit --locked
 
-          # Helper (inline) to update or insert version for a given dep in a file
-          upd() { f="$1" d="$2" v="$3"; \
-            sed -i -E "/^${d}[[:space:]]*=[[:space:]]*\{[^}]*version[[:space:]]*=/ s/(version[[:space:]]*=[[:space:]]*\")[^"]*(\".*)/\\1${v}\\2/" "$f"; \
-            sed -i -E "s#(^${d}[[:space:]]*=[[:space:]]*\{)#\\1 version = \"${v}\",#" "$f"; }
+          echo "Setting workspace version to $new_cargo_version"
+          cargo set-version $new_cargo_version --workspace
 
-          # wormhole/circuit depends on zk-circuits-common
-          upd wormhole/circuit/Cargo.toml zk-circuits-common "$new_cargo_version"
-
-          # wormhole/prover depends on wormhole-circuit and zk-circuits-common
-          upd wormhole/prover/Cargo.toml wormhole-circuit "$new_cargo_version"
-          upd wormhole/prover/Cargo.toml zk-circuits-common "$new_cargo_version"
-
-          # wormhole/verifier depends on zk-circuits-common and wormhole-circuit
-          upd wormhole/verifier/Cargo.toml zk-circuits-common "$new_cargo_version"
-          upd wormhole/verifier/Cargo.toml wormhole-circuit "$new_cargo_version"
-
-          # voting depends on zk-circuits-common
-          upd voting/Cargo.toml zk-circuits-common "$new_cargo_version"
-
-          # wormhole/aggregator depends on internal crates
-          upd wormhole/aggregator/Cargo.toml wormhole-prover "$new_cargo_version"
-          upd wormhole/aggregator/Cargo.toml wormhole-verifier "$new_cargo_version"
-          upd wormhole/aggregator/Cargo.toml wormhole-circuit "$new_cargo_version"
-          upd wormhole/aggregator/Cargo.toml zk-circuits-common "$new_cargo_version"
-
-          # Non-published crates: example, circuit-builder, tests, test-helpers (for consistency)
-          upd wormhole/example/Cargo.toml wormhole-circuit "$new_cargo_version"
-          upd wormhole/example/Cargo.toml wormhole-prover "$new_cargo_version"
-          upd wormhole/example/Cargo.toml zk-circuits-common "$new_cargo_version"
-          upd wormhole/circuit-builder/Cargo.toml wormhole-circuit "$new_cargo_version"
-          upd wormhole/circuit-builder/Cargo.toml zk-circuits-common "$new_cargo_version"
-          upd wormhole/tests/Cargo.toml wormhole-aggregator "$new_cargo_version"
-          upd wormhole/tests/Cargo.toml wormhole-circuit "$new_cargo_version"
-          upd wormhole/tests/Cargo.toml wormhole-prover "$new_cargo_version"
-          upd wormhole/tests/Cargo.toml wormhole-verifier "$new_cargo_version"
-          upd wormhole/tests/Cargo.toml zk-circuits-common "$new_cargo_version"
-          upd wormhole/tests/test-helpers/Cargo.toml wormhole-circuit "$new_cargo_version"
-          upd wormhole/tests/test-helpers/Cargo.toml zk-circuits-common "$new_cargo_version"
-
-          # wormhole/aggregator depends on multiple internal crates
-          sed -i -E "s#^(wormhole-prover\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/aggregator/Cargo.toml
-          sed -i -E "s#^(wormhole-verifier\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/aggregator/Cargo.toml
-          sed -i -E "s#^(wormhole-circuit\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/aggregator/Cargo.toml
-          sed -i -E "s#^(zk-circuits-common\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/aggregator/Cargo.toml
+          echo "Adding version fields to internal dependencies"
+          # Use cargo-edit to add version to internal dependencies that have path
+          cargo add zk-circuits-common@$new_cargo_version --path ./common --manifest-path wormhole/circuit/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/prover/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/prover/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/verifier/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/verifier/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../common --manifest-path voting/Cargo.toml || true
+          cargo add wormhole-prover@$new_cargo_version --path ../prover --manifest-path wormhole/aggregator/Cargo.toml || true
+          cargo add wormhole-verifier@$new_cargo_version --path ../verifier --manifest-path wormhole/aggregator/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/aggregator/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/aggregator/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/example/Cargo.toml || true
+          cargo add wormhole-prover@$new_cargo_version --path ../prover --manifest-path wormhole/example/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/example/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/circuit-builder/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/circuit-builder/Cargo.toml || true
+          cargo add wormhole-aggregator@$new_cargo_version --path ../aggregator --manifest-path wormhole/tests/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/tests/Cargo.toml || true
+          cargo add wormhole-prover@$new_cargo_version --path ../prover --manifest-path wormhole/tests/Cargo.toml || true
+          cargo add wormhole-verifier@$new_cargo_version --path ../verifier --manifest-path wormhole/tests/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/tests/Cargo.toml || true
+          cargo add wormhole-circuit@$new_cargo_version --path ../../circuit --manifest-path wormhole/tests/test-helpers/Cargo.toml || true
+          cargo add zk-circuits-common@$new_cargo_version --path ../../../common --manifest-path wormhole/tests/test-helpers/Cargo.toml || true
 
           # Ensure lockfile updated
           cargo update -w
