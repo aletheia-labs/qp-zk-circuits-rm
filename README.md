@@ -90,3 +90,71 @@ To run prover and verifier benchmarks:
 ```sh
 cargo bench
 ```
+
+## CI/CD and Release Process
+
+This repository uses an automated CI/CD pipeline for continuous integration and publishing to [crates.io](https://crates.io).
+
+### Continuous Integration
+
+The CI pipeline runs on every push and pull request, performing:
+
+- **Format checks**: Ensures code follows consistent formatting using `rustfmt` and `taplo`
+- **Build verification**: Compiles all workspace crates
+- **Test execution**: Runs the complete test suite
+- **Clippy linting**: Performs static analysis for code quality
+- **Documentation**: Builds and verifies documentation
+- **Security audit**: Checks for known vulnerabilities in dependencies
+
+### Release Process
+
+The release process is fully automated and follows semantic versioning:
+
+#### 1. Creating a Release Proposal
+
+To initiate a new release, trigger the "Create Release Proposal" workflow manually from the GitHub Actions tab. This workflow:
+
+- Creates a new branch with version updates
+- Bumps the workspace version across all crates
+- Updates internal dependency versions
+- Formats code and commits changes
+- Opens a Pull Request with the proposed release
+
+#### 2. Publishing the Release
+
+Once the release proposal PR is reviewed and merged, the "Create Release Tag and Publish" workflow automatically:
+
+- Creates a Git tag for the new version
+- Generates a GitHub release with release notes
+- Publishes all crates to crates.io in dependency order:
+  1. `al-zk-circuits-common` - Shared utilities and gadgets
+  2. `al-wormhole-circuit` - Core Wormhole circuit implementation
+  3. `al-wormhole-circuit-builder` - Circuit builder utilities
+  4. `al-wormhole-prover` - Wormhole proof generation
+  5. `al-wormhole-verifier` - Wormhole proof verification
+
+### Published Crates
+
+All published crates use the `al-` prefix and are available on crates.io:
+
+- [`al-zk-circuits-common`](https://crates.io/crates/al-zk-circuits-common) - Common utilities and circuit gadgets
+- [`al-wormhole-circuit`](https://crates.io/crates/al-wormhole-circuit) - Wormhole message verification circuit
+- [`al-wormhole-prover`](https://crates.io/crates/al-wormhole-prover) - Wormhole circuit prover
+- [`al-wormhole-verifier`](https://crates.io/crates/al-wormhole-verifier) - Wormhole circuit verifier
+- [`al-wormhole-circuit-builder`](https://crates.io/crates/al-wormhole-circuit-builder) - Circuit building utilities
+
+### Using Published Crates
+
+To use these crates in your project, add them to your `Cargo.toml`:
+
+```toml
+[dependencies]
+al-zk-circuits-common = "0.0.2"
+al-wormhole-circuit = "0.0.2"
+al-wormhole-prover = "0.0.2"
+al-wormhole-verifier = "0.0.2"
+```
+
+### Development vs Production Dependencies
+
+During development, the workspace uses local path dependencies for fast iteration. When published to crates.io, these are automatically replaced with version-based dependencies to ensure proper dependency resolution.
