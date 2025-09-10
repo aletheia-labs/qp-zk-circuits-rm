@@ -146,7 +146,7 @@ jobs:
           cargo install cargo-edit --locked
 
           echo "Setting workspace version to $new_cargo_version"
-          cargo set-version $new_cargo_version --workspace
+          cargo set-version $new_cargo_version --workspace --allow-prerelease
 
           echo "Adding version fields to internal dependencies"
           # Use cargo-edit to add version to internal dependencies that have path

@@ -60,7 +60,7 @@ dependencies = [
 
 [[package]]
 name = "al-wormhole-circuit-builder"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "al-wormhole-circuit",
  "al-zk-circuits-common",
@@ -819,7 +819,7 @@ dependencies = [
 
 [[package]]
 name = "test-helpers"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "al-wormhole-circuit",
  "al-zk-circuits-common",
@@ -1096,7 +1096,7 @@ checksum = "5c573471f125075647d03df72e026074b7203790d41351cd6edc96f46bcccd36"
 
 [[package]]
 name = "wormhole-example"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "al-wormhole-circuit",
  "al-wormhole-prover",

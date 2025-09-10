@@ -2,7 +2,7 @@
 edition = "2021"
 name = "al-wormhole-circuit-builder"
 publish = true
-version = "0.1.0"
+version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true, features = ["std"] }
