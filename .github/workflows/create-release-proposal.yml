@@ -139,15 +139,16 @@ jobs:
 
           # Update workspace package version in root Cargo.toml
           echo "Updating [workspace.package] version in Cargo.toml to: $new_cargo_version"
-          sed -i -E "s/^(version\s*=\s*)\"[0-9a-zA-Z.-]+\"/\\1\"$new_cargo_version\"/" Cargo.toml
+          # Portable regex: avoid capturing groups and \s; use POSIX classes
+          sed -i -E 's/^version[[:space:]]*=[[:space:]]*"[^"]*"/version = "'$new_cargo_version'"/' Cargo.toml
 
           # Helper to set or insert version in dependency table (idempotent for one-line deps)
           set_dep_version() {
             local file="$1" dep="$2" ver="$3"
             # If version exists inside the dependency braces, replace it
-            sed -i -E "/^${dep}\\s*=\\s*\\{[^}]*version\\s*=/ s/(version\\s*=\\s*\")[^"]*(\".*)/\\1${ver}\\2/" "$file"
+            sed -i -E "/^${dep}[[:space:]]*=[[:space:]]*\{[^}]*version[[:space:]]*=/ s/(version[[:space:]]*=[[:space:]]*\")[^"]*(\".*)/\\1${ver}\\2/" "$file"
             # If version not present, insert after opening brace
-            sed -i -E "s#(^${dep}\\s*=\\s*\\{)#\\1 version = \"${ver}\",#" "$file"
+            sed -i -E "s#(^${dep}[[:space:]]*=[[:space:]]*\{)#\\1 version = \"${ver}\",#" "$file"
           }
 
           echo "Injecting internal dependency versions across workspace"
