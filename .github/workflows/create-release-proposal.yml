@@ -148,34 +148,13 @@ jobs:
           echo "Setting workspace version to $new_cargo_version"
           cargo set-version $new_cargo_version --workspace
 
-          echo "Adding version fields to internal dependencies"
-          # Use cargo-edit to add version to internal dependencies that have path
-          # Note: cargo add uses the actual crate name (with al- prefix), not the dependency alias
-          cargo add al-zk-circuits-common@$new_cargo_version --path ./common --manifest-path wormhole/circuit/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/prover/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/prover/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/verifier/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/verifier/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../common --manifest-path voting/Cargo.toml || true
-          cargo add al-wormhole-prover@$new_cargo_version --path ../prover --manifest-path wormhole/aggregator/Cargo.toml || true
-          cargo add al-wormhole-verifier@$new_cargo_version --path ../verifier --manifest-path wormhole/aggregator/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/aggregator/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/aggregator/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/example/Cargo.toml || true
-          cargo add al-wormhole-prover@$new_cargo_version --path ../prover --manifest-path wormhole/example/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/example/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/circuit-builder/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/circuit-builder/Cargo.toml || true
-          cargo add al-wormhole-aggregator@$new_cargo_version --path ../aggregator --manifest-path wormhole/tests/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../circuit --manifest-path wormhole/tests/Cargo.toml || true
-          cargo add al-wormhole-prover@$new_cargo_version --path ../prover --manifest-path wormhole/tests/Cargo.toml || true
-          cargo add al-wormhole-verifier@$new_cargo_version --path ../verifier --manifest-path wormhole/tests/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../common --manifest-path wormhole/tests/Cargo.toml || true
-          cargo add al-wormhole-circuit@$new_cargo_version --path ../../circuit --manifest-path wormhole/tests/test-helpers/Cargo.toml || true
-          cargo add al-zk-circuits-common@$new_cargo_version --path ../../../common --manifest-path wormhole/tests/test-helpers/Cargo.toml || true
+          echo "Updating version fields in internal dependencies"
+          # Update version field in existing dependencies that have both version and path
+          # Use sed to update version = "old" to version = "new" in dependency lines
+          find . -name "Cargo.toml" -exec sed -i -E "s/(version = \")[0-9]+\\.[0-9]+\\.[0-9]+(\", path = )/\\1$new_cargo_version\\2/g" {} \;
 
-          # Ensure lockfile updated
-          cargo update -w
+          # Verify workspace compiles after version changes
+          cargo check --workspace --locked
 
           # Install formatters
           rustup component add rustfmt --toolchain nightly
