@@ -142,50 +142,46 @@ jobs:
           # Portable regex: avoid capturing groups and \s; use POSIX classes
           sed -i -E 's/^version[[:space:]]*=[[:space:]]*"[^"]*"/version = "'$new_cargo_version'"/' Cargo.toml
 
-          # Helper to set or insert version in dependency table (idempotent for one-line deps)
-          set_dep_version() {
-            local file="$1" dep="$2" ver="$3"
-            # If version exists inside the dependency braces, replace it
-            sed -i -E "/^${dep}[[:space:]]*=[[:space:]]*\{[^}]*version[[:space:]]*=/ s/(version[[:space:]]*=[[:space:]]*\")[^"]*(\".*)/\\1${ver}\\2/" "$file"
-            # If version not present, insert after opening brace
-            sed -i -E "s#(^${dep}[[:space:]]*=[[:space:]]*\{)#\\1 version = \"${ver}\",#" "$file"
-          }
-
           echo "Injecting internal dependency versions across workspace"
 
+          # Helper (inline) to update or insert version for a given dep in a file
+          upd() { f="$1" d="$2" v="$3"; \
+            sed -i -E "/^${d}[[:space:]]*=[[:space:]]*\{[^}]*version[[:space:]]*=/ s/(version[[:space:]]*=[[:space:]]*\")[^"]*(\".*)/\\1${v}\\2/" "$f"; \
+            sed -i -E "s#(^${d}[[:space:]]*=[[:space:]]*\{)#\\1 version = \"${v}\",#" "$f"; }
+
           # wormhole/circuit depends on zk-circuits-common
-          set_dep_version wormhole/circuit/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/circuit/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/prover depends on wormhole-circuit and zk-circuits-common
-          set_dep_version wormhole/prover/Cargo.toml wormhole-circuit "$new_cargo_version"
-          set_dep_version wormhole/prover/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/prover/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/prover/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/verifier depends on zk-circuits-common and wormhole-circuit
-          set_dep_version wormhole/verifier/Cargo.toml zk-circuits-common "$new_cargo_version"
-          set_dep_version wormhole/verifier/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/verifier/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/verifier/Cargo.toml wormhole-circuit "$new_cargo_version"
 
           # voting depends on zk-circuits-common
-          set_dep_version voting/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd voting/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/aggregator depends on internal crates
-          set_dep_version wormhole/aggregator/Cargo.toml wormhole-prover "$new_cargo_version"
-          set_dep_version wormhole/aggregator/Cargo.toml wormhole-verifier "$new_cargo_version"
-          set_dep_version wormhole/aggregator/Cargo.toml wormhole-circuit "$new_cargo_version"
-          set_dep_version wormhole/aggregator/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/aggregator/Cargo.toml wormhole-prover "$new_cargo_version"
+          upd wormhole/aggregator/Cargo.toml wormhole-verifier "$new_cargo_version"
+          upd wormhole/aggregator/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/aggregator/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # Non-published crates: example, circuit-builder, tests, test-helpers (for consistency)
-          set_dep_version wormhole/example/Cargo.toml wormhole-circuit "$new_cargo_version"
-          set_dep_version wormhole/example/Cargo.toml wormhole-prover "$new_cargo_version"
-          set_dep_version wormhole/example/Cargo.toml zk-circuits-common "$new_cargo_version"
-          set_dep_version wormhole/circuit-builder/Cargo.toml wormhole-circuit "$new_cargo_version"
-          set_dep_version wormhole/circuit-builder/Cargo.toml zk-circuits-common "$new_cargo_version"
-          set_dep_version wormhole/tests/Cargo.toml wormhole-aggregator "$new_cargo_version"
-          set_dep_version wormhole/tests/Cargo.toml wormhole-circuit "$new_cargo_version"
-          set_dep_version wormhole/tests/Cargo.toml wormhole-prover "$new_cargo_version"
-          set_dep_version wormhole/tests/Cargo.toml wormhole-verifier "$new_cargo_version"
-          set_dep_version wormhole/tests/Cargo.toml zk-circuits-common "$new_cargo_version"
-          set_dep_version wormhole/tests/test-helpers/Cargo.toml wormhole-circuit "$new_cargo_version"
-          set_dep_version wormhole/tests/test-helpers/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/example/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/example/Cargo.toml wormhole-prover "$new_cargo_version"
+          upd wormhole/example/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/circuit-builder/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/circuit-builder/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/tests/Cargo.toml wormhole-aggregator "$new_cargo_version"
+          upd wormhole/tests/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/tests/Cargo.toml wormhole-prover "$new_cargo_version"
+          upd wormhole/tests/Cargo.toml wormhole-verifier "$new_cargo_version"
+          upd wormhole/tests/Cargo.toml zk-circuits-common "$new_cargo_version"
+          upd wormhole/tests/test-helpers/Cargo.toml wormhole-circuit "$new_cargo_version"
+          upd wormhole/tests/test-helpers/Cargo.toml zk-circuits-common "$new_cargo_version"
 
           # wormhole/aggregator depends on multiple internal crates
           sed -i -E "s#^(wormhole-prover\s*=\s*\{)([^}]*)\}#\\1 version = \"$new_cargo_version\", \2}#" wormhole/aggregator/Cargo.toml
@@ -208,7 +204,17 @@ jobs:
           git config user.name "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
 
-          git add Cargo.toml wormhole/circuit/Cargo.toml wormhole/prover/Cargo.toml wormhole/verifier/Cargo.toml voting/Cargo.toml Cargo.lock || true
+          git add Cargo.toml \
+            wormhole/circuit/Cargo.toml \
+            wormhole/prover/Cargo.toml \
+            wormhole/verifier/Cargo.toml \
+            wormhole/aggregator/Cargo.toml \
+            wormhole/circuit-builder/Cargo.toml \
+            wormhole/example/Cargo.toml \
+            wormhole/tests/Cargo.toml \
+            wormhole/tests/test-helpers/Cargo.toml \
+            voting/Cargo.toml \
+            Cargo.lock || true
           git commit -m "ci: Automate workspace version bump to $NEW_VERSION"
           git push origin "$branch_name"
 
