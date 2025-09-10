@@ -127,21 +127,21 @@ Once the release proposal PR is reviewed and merged, the "Create Release Tag and
 - Creates a Git tag for the new version
 - Generates a GitHub release with release notes
 - Publishes all crates to crates.io in dependency order:
-  1. `al-zk-circuits-common` - Shared utilities and gadgets
-  2. `al-wormhole-circuit` - Core Wormhole circuit implementation
-  3. `al-wormhole-circuit-builder` - Circuit builder utilities
-  4. `al-wormhole-prover` - Wormhole proof generation
-  5. `al-wormhole-verifier` - Wormhole proof verification
+  1. `qp-zk-circuits-common` - Shared utilities and gadgets
+  2. `qp-wormhole-circuit` - Core Wormhole circuit implementation
+  3. `qp-wormhole-circuit-builder` - Circuit builder utilities
+  4. `qp-wormhole-prover` - Wormhole proof generation
+  5. `qp-wormhole-verifier` - Wormhole proof verification
 
 ### Published Crates
 
-All published crates use the `al-` prefix and are available on crates.io:
+All published crates use the `qp-` prefix and are available on crates.io:
 
-- [`al-zk-circuits-common`](https://crates.io/crates/al-zk-circuits-common) - Common utilities and circuit gadgets
-- [`al-wormhole-circuit`](https://crates.io/crates/al-wormhole-circuit) - Wormhole message verification circuit
-- [`al-wormhole-prover`](https://crates.io/crates/al-wormhole-prover) - Wormhole circuit prover
-- [`al-wormhole-verifier`](https://crates.io/crates/al-wormhole-verifier) - Wormhole circuit verifier
-- [`al-wormhole-circuit-builder`](https://crates.io/crates/al-wormhole-circuit-builder) - Circuit building utilities
+- [`qp-zk-circuits-common`](https://crates.io/crates/qp-zk-circuits-common) - Common utilities and circuit gadgets
+- [`qp-wormhole-circuit`](https://crates.io/crates/qp-wormhole-circuit) - Wormhole message verification circuit
+- [`qp-wormhole-prover`](https://crates.io/crates/qp-wormhole-prover) - Wormhole circuit prover
+- [`qp-wormhole-verifier`](https://crates.io/crates/qp-wormhole-verifier) - Wormhole circuit verifier
+- [`qp-wormhole-circuit-builder`](https://crates.io/crates/qp-wormhole-circuit-builder) - Circuit building utilities
 
 ### Using Published Crates
 
@@ -149,10 +149,10 @@ To use these crates in your project, add them to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-al-zk-circuits-common = "0.0.2"
-al-wormhole-circuit = "0.0.2"
-al-wormhole-prover = "0.0.2"
-al-wormhole-verifier = "0.0.2"
+qp-zk-circuits-common = "0.0.3"
+qp-wormhole-circuit = "0.0.3"
+qp-wormhole-prover = "0.0.3"
+qp-wormhole-verifier = "0.0.3"
 ```
 
 ### Development vs Production Dependencies

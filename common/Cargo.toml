@@ -3,7 +3,7 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-name = "al-zk-circuits-common"
+name = "qp-zk-circuits-common"
 version.workspace = true
 
 [dependencies]

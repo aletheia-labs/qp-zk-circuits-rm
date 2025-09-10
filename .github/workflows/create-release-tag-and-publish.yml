@@ -166,42 +166,42 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Publishing al-zk-circuits-common"
+          echo "Publishing qp-zk-circuits-common"
           (cd common && cargo publish --token "$CARGO_REGISTRY_TOKEN" --allow-dirty)
 
-          echo "Waiting for al-zk-circuits-common to become available on crates.io"
+          echo "Waiting for qp-zk-circuits-common to become available on crates.io"
           sleep 30
 
-          echo "Preparing al-wormhole-circuit for publish (strip local paths)"
+          echo "Preparing qp-wormhole-circuit for publish (strip local paths)"
           sed -i -E 's/,\s*path\s*=\s*"[^"]+"//g' wormhole/circuit/Cargo.toml
-          echo "Publishing al-wormhole-circuit"
+          echo "Publishing qp-wormhole-circuit"
           (cd wormhole/circuit && cargo publish --token "$CARGO_REGISTRY_TOKEN" --allow-dirty)
 
-          echo "Waiting for al-wormhole-circuit to become available on crates.io"
+          echo "Waiting for qp-wormhole-circuit to become available on crates.io"
           sleep 30
 
-          echo "Preparing al-wormhole-circuit-builder for publish (strip local paths)"
+          echo "Preparing qp-wormhole-circuit-builder for publish (strip local paths)"
           sed -i -E 's/,\s*path\s*=\s*"[^"]+"//g' wormhole/circuit-builder/Cargo.toml
-          echo "Publishing al-wormhole-circuit-builder"
+          echo "Publishing qp-wormhole-circuit-builder"
           (cd wormhole/circuit-builder && cargo publish --token "$CARGO_REGISTRY_TOKEN" --allow-dirty)
 
-          echo "Waiting for al-wormhole-circuit-builder to become available on crates.io"
+          echo "Waiting for qp-wormhole-circuit-builder to become available on crates.io"
           sleep 30
 
-          echo "Preparing al-wormhole-prover for publish (strip local paths)"
+          echo "Preparing qp-wormhole-prover for publish (strip local paths)"
           sed -i -E 's/,\s*path\s*=\s*"[^"]+"//g' wormhole/prover/Cargo.toml
-          echo "Publishing al-wormhole-prover"
+          echo "Publishing qp-wormhole-prover"
           (cd wormhole/prover && cargo publish --token "$CARGO_REGISTRY_TOKEN" --allow-dirty)
 
-          echo "Waiting for al-wormhole-prover to become available on crates.io"
+          echo "Waiting for qp-wormhole-prover to become available on crates.io"
           sleep 30
 
-          echo "Preparing al-wormhole-verifier for publish (strip local paths)"
+          echo "Preparing qp-wormhole-verifier for publish (strip local paths)"
           sed -i -E 's/,\s*path\s*=\s*"[^"]+"//g' wormhole/verifier/Cargo.toml
-          echo "Publishing al-wormhole-verifier"
+          echo "Publishing qp-wormhole-verifier"
           (cd wormhole/verifier && cargo publish --token "$CARGO_REGISTRY_TOKEN" --allow-dirty)
 
-          echo "Waiting for al-wormhole-verifier to become available on crates.io"
+          echo "Waiting for qp-wormhole-verifier to become available on crates.io"
           sleep 30
 
           # Skipping voting-circuit: publish = false

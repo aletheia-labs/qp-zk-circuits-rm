@@ -18,8 +18,8 @@
 //! use wormhole_circuit::storage_proof::ProcessedStorageProof;
 //! use wormhole_circuit::substrate_account::SubstrateAccount;
 //! use wormhole_circuit::unspendable_account::UnspendableAccount;
-//! use al_wormhole_prover::WormholeProver;
-//! use al_wormhole_verifier::WormholeVerifier;
+//! use qp_wormhole_prover::WormholeProver;
+//! use qp_wormhole_verifier::WormholeVerifier;
 //! use plonky2::plonk::circuit_data::CircuitConfig;
 //! use std::path::Path;
 //!

@@ -3,14 +3,14 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-name = "al-wormhole-circuit"
+name = "qp-wormhole-circuit"
 version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 hex = { workspace = true, features = ["alloc"] }
 qp-plonky2 = { workspace = true }
-zk-circuits-common = { package = "al-zk-circuits-common", version = "0.0.3", path = "../../common", default-features = false }
+zk-circuits-common = { package = "qp-zk-circuits-common", version = "0.0.3", path = "../../common", default-features = false }
 
 [features]
 default = ["std"]

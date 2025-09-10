@@ -17,7 +17,7 @@
 //! use wormhole_circuit::storage_proof::ProcessedStorageProof;
 //! use wormhole_circuit::substrate_account::SubstrateAccount;
 //! use wormhole_circuit::unspendable_account::UnspendableAccount;
-//! use al_wormhole_prover::WormholeProver;
+//! use qp_wormhole_prover::WormholeProver;
 //! use plonky2::plonk::circuit_data::CircuitConfig;
 //!
 //! # fn main() -> anyhow::Result<()> {

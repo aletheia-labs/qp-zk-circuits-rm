@@ -3,14 +3,14 @@ authors.workspace = true
 description.workspace = true
 edition.workspace = true
 license.workspace = true
-name = "al-wormhole-circuit-builder"
+name = "qp-wormhole-circuit-builder"
 publish = true
 version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true, features = ["std"] }
 qp-plonky2 = { workspace = true, features = ["default"] }
-wormhole-circuit = { package = "al-wormhole-circuit", version = "0.0.3", path = "../circuit", default-features = false, features = [
+wormhole-circuit = { package = "qp-wormhole-circuit", version = "0.0.3", path = "../circuit", default-features = false, features = [
 	"std",
 ] }
-zk-circuits-common = { package = "al-zk-circuits-common", version = "0.0.3", path = "../../common" }
+zk-circuits-common = { package = "qp-zk-circuits-common", version = "0.0.3", path = "../../common" }

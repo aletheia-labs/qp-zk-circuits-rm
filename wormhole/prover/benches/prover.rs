@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use al_wormhole_prover::WormholeProver;
 use criterion::{criterion_group, criterion_main, Criterion};
 use plonky2::plonk::circuit_data::CircuitConfig;
+use qp_wormhole_prover::WormholeProver;
 use test_helpers::storage_proof::TestInputs;
 use wormhole_circuit::inputs::CircuitInputs;
 
