@@ -13,8 +13,8 @@ wormhole-circuit = { package = "qp-wormhole-circuit", version = "0.0.3", path = 
 zk-circuits-common = { package = "qp-zk-circuits-common", version = "0.0.3", path = "../../common", default-features = false }
 
 [dev-dependencies]
-qp-wormhole-prover = { path = "../prover" }
 criterion = { workspace = true }
+qp-wormhole-prover = { path = "../prover" }
 
 [features]
 default = ["std"]
