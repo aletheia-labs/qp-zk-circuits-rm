@@ -13,8 +13,8 @@ wormhole-circuit = { package = "al-wormhole-circuit", path = "../circuit", defau
 zk-circuits-common = { package = "al-zk-circuits-common", path = "../../common", default-features = false }
 
 [dev-dependencies]
-criterion = { workspace = true }
 al-wormhole-prover = { path = "../prover" }
+criterion = { workspace = true }
 
 [features]
 default = ["std"]
