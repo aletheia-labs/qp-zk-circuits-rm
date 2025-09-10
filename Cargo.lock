@@ -26,7 +26,7 @@ dependencies = [
 
 [[package]]
 name = "al-voting-circuit"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-zk-circuits-common",
  "anyhow",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "al-wormhole-aggregator"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-circuit",
  "al-wormhole-prover",
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "al-wormhole-circuit"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-zk-circuits-common",
  "anyhow",
@@ -60,7 +60,7 @@ dependencies = [
 
 [[package]]
 name = "al-wormhole-circuit-builder"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-circuit",
  "al-zk-circuits-common",
@@ -70,7 +70,7 @@ dependencies = [
 
 [[package]]
 name = "al-wormhole-prover"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-circuit",
  "al-zk-circuits-common",
@@ -82,7 +82,7 @@ dependencies = [
 
 [[package]]
 name = "al-wormhole-verifier"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-circuit",
  "al-wormhole-prover",
@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "al-zk-circuits-common"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "qp-plonky2",
@@ -819,7 +819,7 @@ dependencies = [
 
 [[package]]
 name = "test-helpers"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-circuit",
  "al-zk-circuits-common",
@@ -829,7 +829,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-aggregator",
  "al-wormhole-circuit",
@@ -1096,7 +1096,7 @@ checksum = "5c573471f125075647d03df72e026074b7203790d41351cd6edc96f46bcccd36"
 
 [[package]]
 name = "wormhole-example"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "al-wormhole-circuit",
  "al-wormhole-prover",
