@@ -25,12 +25,12 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 [workspace.package]
 authors = ["Quantus Network"]
 categories = ["cryptography"]
-description = "Wormhole circuit implementation using Plonky2"
+description = "Quantus-Network - Wormhole circuit implementation using Plonky2"
 edition = "2021"
-keywords = ["circuits", "plonky2", "wormhole", "zk"]
+keywords = ["circuits", "plonky2", "wormhole", "zk","quantus-network"]
 license = "MIT"
-repository = "https://github.com/aletheia-labs/qp-zk-circuits-rm"
-version = "0.0.3"
+repository = "https://github.com/Quantus-Network/qp-zk-circuits"
+version = "0.1.0"
 
 [workspace.lints.clippy]
 uninlined_format_args = "allow"

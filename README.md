@@ -149,10 +149,10 @@ To use these crates in your project, add them to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-qp-zk-circuits-common = "0.0.3"
-qp-wormhole-circuit = "0.0.3"
-qp-wormhole-prover = "0.0.3"
-qp-wormhole-verifier = "0.0.3"
+qp-zk-circuits-common = "0.1.0"
+qp-wormhole-circuit = "0.1.0"
+qp-wormhole-prover = "0.1.0"
+qp-wormhole-verifier = "0.1.0"
 ```
 
 ### Development vs Production Dependencies
